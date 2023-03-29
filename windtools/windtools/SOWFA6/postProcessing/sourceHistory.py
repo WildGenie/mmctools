@@ -67,7 +67,7 @@ class SourceHistory(Reader):
             try:
                 self._read_source_heights(f)
             except IOError:
-                print('unable to read '+fpath)
+                print(f'unable to read {fpath}')
             else:
                 array = self._read_source_data(f)
         return array

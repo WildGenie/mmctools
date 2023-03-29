@@ -128,10 +128,10 @@ class ProbeSets(Reader):
         
     def _processdirs(self, tdirList, trimOverlap=False, **kwargs):
         print('Probe data saved:',len(self.simStartTimes), 'time steps, from', \
-              self.simStartTimes[0],'s to',self.simStartTimes[-1],'s')
+                  self.simStartTimes[0],'s to',self.simStartTimes[-1],'s')
 
-        # make varList iterable if not already a list 
-        varList = [self.varList] if not isinstance(self.varList, (list)) else self.varList
+        # make varList iterable if not already a list
+        varList = self.varList if isinstance(self.varList, (list)) else [self.varList]
         # Create a list of all the probe files that will be processed
         if varList[0].lower()=='all':
             print('No varList given. Reading all probes.')
@@ -139,9 +139,9 @@ class ProbeSets(Reader):
                             if os.path.isfile(tdirList[0]+os.sep+fname) ]
         else:
             # Make values iterable if not specified list
-            fprefix = [self.fprefix] if not isinstance(self.fprefix, (list)) else self.fprefix
-            fparam  = [self.fparam]  if not isinstance(self.fparam,  (list)) else self.fparam
-            fsuffix = [self.fsuffix] if not isinstance(self.fsuffix, (list)) else self.fsuffix
+            fprefix = self.fprefix if isinstance(self.fprefix, (list)) else [self.fprefix]
+            fparam = self.fparam if isinstance(self.fparam,  (list)) else [self.fparam]
+            fsuffix = self.fsuffix if isinstance(self.fsuffix, (list)) else [self.fsuffix]
             # create a varList that contains all the files names
             fileList = []
             for var in varList:
@@ -157,19 +157,19 @@ class ProbeSets(Reader):
         # Get list of times and trim the data
         self.times = [float(os.path.basename(p)) for p in self.simTimeDirs]
         tdirList = self._trimtimes(tdirList,self.tstart,self.tend)
-        
+
         try:
             print('Probe data requested:',len(tdirList), 'time steps, from', \
-                  float(os.path.basename(tdirList[0])),'s to', \
-                  float(os.path.basename(tdirList[-1])),'s')
+                      float(os.path.basename(tdirList[0])),'s to', \
+                      float(os.path.basename(tdirList[-1])),'s')
         except IndexError:
             raise ValueError('End time needs to be greater than the start time')
-                
+
         # Raise an error if list is empty
         if not tdirList:
             raise ValueError('No time directories found')
-        
-        # Process all data. Loop on files, not variables. the files, however, contain a single varible. 
+
+        # Process all data. Loop on files, not variables. the files, however, contain a single varible.
         for field in outputs:
             # parse the name to create the right variable (var is always a list)
             param, var = self._parseProbeName(field)
@@ -183,8 +183,8 @@ class ProbeSets(Reader):
                 print('Param is integer. Assuming it means zagl and adding it')
                 # add the zagl to the array
                 arrays = np.hstack((arrays[:,:4], \
-                                    np.full((arrays.shape[0],1),param), \
-                                    arrays[:,4:]))
+                                        np.full((arrays.shape[0],1),param), \
+                                        arrays[:,4:]))
                 self._printzagl = True
 
             try:
@@ -192,15 +192,15 @@ class ProbeSets(Reader):
             except AttributeError:
                 setattr( self, var, arrays )
 
-            if not var in self._processed:  
+            if var not in self._processed:  
                 self._processed.append(var)
             print(f'  read {self.fprefix}{param}_*{self.fsuffix}, variable {var}') 
 
         self.t = np.unique(arrays[:,0])
         self.Nt = len(self.t)
-        
+
         # sort times
-        for var in self._allVars:
+        for _ in self._allVars:
             try:
                 self.var = self.var[np.argsort(self.var[:,0])]
             except AttributeError:
@@ -216,7 +216,7 @@ class ProbeSets(Reader):
 
         # Remove the prefix and suffix from the full field name
         f = field.replace(self.fprefix,'').replace(self.fsuffix,'')
-        
+
         # Find the variable(s) that are in the field name
         for v in self._allVars:
             if v in f:
@@ -226,9 +226,7 @@ class ProbeSets(Reader):
                 break
 
         # what is left is the param
-        if f.isdigit():  param = int(f)
-        else:            param = f
-
+        param = int(f) if f.isdigit() else f
         return param, var
     
 

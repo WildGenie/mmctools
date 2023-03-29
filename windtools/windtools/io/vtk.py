@@ -90,18 +90,17 @@ def readVTK(vtkpath, sliceType=None, dateref=None, ti=None, tf=None, t=None, res
 
     # Single slice was requested, using `vtlpath='some/path/slice.vtk`
     if os.path.isfile(vtkpath):
-        if isinstance(vtkpath, str):
-            if vtkpath.endswith('.vtk'):
-                print(f'Reading a single VTK. For output with `datetime` as coordinate, specify the path, sliceType, and t (see docstrings for example)')
-                x, y, z, out = readSingleVTK(vtkpath, res=res, squash=squash)
-                ds = VTK2xarray(x, y, z, out)
-                return ds
-            else:
-                raise SyntaxError("Single vtk specification using vtkpath='/path/to/file.vtk' should include the extension")
-        else:
+        if not isinstance(vtkpath, str):
             raise SyntaxError("The vtkpath='path/to/vtks' should be a string.")
 
 
+        if not vtkpath.endswith('.vtk'):
+            raise SyntaxError("Single vtk specification using vtkpath='/path/to/file.vtk' should include the extension")
+        print(
+            'Reading a single VTK. For output with `datetime` as coordinate, specify the path, sliceType, and t (see docstrings for example)'
+        )
+        x, y, z, out = readSingleVTK(vtkpath, res=res, squash=squash)
+        return VTK2xarray(x, y, z, out)
     # Some checks
     assert os.path.isdir(vtkpath), f'Directory of VTKs given {vtkpath} is not a directory. For single VTK, see docstrings for example.'
     if not sliceType.endswith('.vtk'):
@@ -116,7 +115,7 @@ def readVTK(vtkpath, sliceType=None, dateref=None, ti=None, tf=None, t=None, res
     elif ti!= None:
         raise ValueError('If you specify ti, then tf should be specified too')
     else:
-        if t==None:
+        if t is None:
             raise ValueError("You have to specify at least one time. If a single VTK is needed, use " \
                              "vtkpath='path/to/file.vtk' ")
 
@@ -134,9 +133,7 @@ def readVTK(vtkpath, sliceType=None, dateref=None, ti=None, tf=None, t=None, res
         t = times_str[pos_t]
         print(f'Reading a single VTK for time {float(t)}')
         x, y, z, out = readSingleVTK(os.path.join(vtkpath,t,sliceType), res=res, squash=squash)
-        ds = VTK2xarray(x, y, z, out, t, dateref)
-        return ds
-
+        return VTK2xarray(x, y, z, out, t, dateref)
     # Find limits of the requested subset
     pos_ti = min(range(len(times_float)), key=lambda i: abs(times_float[i]-ti))
     pos_tf = min(range(len(times_float)), key=lambda i: abs(times_float[i]-tf))
@@ -282,7 +279,7 @@ def readSingleVTK(vtkfullpath, res=None, squash=None):
     data     = ptdata.GetArray(0)
 
     # Determine what plane the VTK is in
-    if squash == None:
+    if squash is None:
         # Full 3-D field
         dir1=0; dir2=1;
         dirconst=2
@@ -355,8 +352,8 @@ def readSingleVTK(vtkfullpath, res=None, squash=None):
         z1d = np.arange(zminbox, zmaxbox+dz, dz)
     [x3d,y3d,z3d] = np.meshgrid(x1d, y1d, z1d, indexing='ij')
 
-    n = np.ravel(x3d).shape[0]            
-    coords_want = np.zeros(shape=(n,3))    
+    n = np.ravel(x3d).shape[0]
+    coords_want = np.zeros(shape=(n,3))
     coords_want[:,dir1] = np.ravel(x3d)
     coords_want[:,dir2] = np.ravel(y3d)
     coords_want[:,dirconst] = np.ravel(z3d) 

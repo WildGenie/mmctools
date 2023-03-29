@@ -47,19 +47,18 @@ def T_d(T, RH, celsius=False, model='NWS'):
     temperatures are in degrees Celsius; otherwise, inputs and outputs
     are in Kelvin.
     """
-    if model == 'NWS':
-        es = e_s(T, celsius, model='Tetens')
-        # From National Weather Service, using Tetens' formula:
-        # https://www.weather.gov/media/epz/wxcalc/virtualTemperature.pdf
-        # - note the expression for vapor pressure is the saturation vapor
-        #   pressure expression, with Td instead of T
-        e = RH/100. * es
-        denom = 7.5*np.log(10) - np.log(e/6.11)
-        Td = 237.3 * np.log(e/6.11) / denom
-        if not celsius:
-            Td += 273.15
-    else:
+    if model != 'NWS':
         raise ValueError('Unknown model: {:s}'.format(model))
+    es = e_s(T, celsius, model='Tetens')
+    # From National Weather Service, using Tetens' formula:
+    # https://www.weather.gov/media/epz/wxcalc/virtualTemperature.pdf
+    # - note the expression for vapor pressure is the saturation vapor
+    #   pressure expression, with Td instead of T
+    e = RH/100. * es
+    denom = 7.5*np.log(10) - np.log(e/6.11)
+    Td = 237.3 * np.log(e/6.11) / denom
+    if not celsius:
+        Td += 273.15
     return Td
 
 
@@ -155,7 +154,7 @@ def calc_wind(df,u='u',v='v'):
         fields = df.columns
     elif isinstance(df,xr.Dataset):
         fields = df.variables
-    if not all(velcomp in fields for velcomp in [u,v]):
+    if any(velcomp not in fields for velcomp in [u, v]):
         print(('velocity components u/v not found; '
                'set u and/or v to calculate wind speed/direction'))
     else:
@@ -170,7 +169,7 @@ def calc_uv(df,wspd='wspd',wdir='wdir'):
         fields = df.columns
     elif isinstance(df,xr.Dataset):
         fields = df.variables
-    if not all(windvar in fields for windvar in [wspd,wdir]):
+    if any(windvar not in fields for windvar in [wspd, wdir]):
         print(('wind speed/direction not found; '
                'set wspd and/or wpd to calculate velocity components'))
     else:
@@ -252,10 +251,7 @@ def covariance(a,b,interval='10min',resample=False,**kwargs):
         b_mean = b.rolling(interval).mean()
         ab_mean = (a*b).rolling(interval,**kwargs).mean()
     cov = ab_mean - a_mean*b_mean
-    if have_multiindex:
-        return cov.stack()
-    else:
-        return cov
+    return cov.stack() if have_multiindex else cov
 
 def power_spectral_density(df, var_oi=None, xvar_oi=[], tstart=None, interval=None,
                            window_size='10min', window_type='hanning', detrend='linear',
@@ -422,10 +418,7 @@ def lowess_mean(ds,win_size,lowess_delta):
 
     init_ds_means = True
 
-    lowess_smth = lowess(ds.data, exog, 
-                         frac=sm_frac, 
-                         delta=lowess_delta)[:,1]
-    return(lowess_smth)
+    return lowess(ds.data, exog, frac=sm_frac, delta=lowess_delta)[:, 1]
 
 def model4D_calcQOIs(ds,mean_dim,data_type='wrfout', mean_opt='static', lowess_delta=0, lowess_window=None):
     """
@@ -467,11 +460,7 @@ def model4D_calcQOIs(ds,mean_dim,data_type='wrfout', mean_opt='static', lowess_d
         init_ds_means = True
         for varn in var_keys:
             print(varn)
-            if varn == 'wspd':
-                var_str = '{:s}Mean'.format('U')
-            else:
-                var_str = '{:s}Mean'.format(varn)
-
+            var_str = '{:s}Mean'.format('U') if varn == 'wspd' else '{:s}Mean'.format(varn)
             lowess_smth = np.zeros((ds.datetime.data.size, ds.nz.data.size, 
                                     ds.ny.data.size, ds.nx.data.size))
             loop_start = time.time()
@@ -483,9 +472,9 @@ def model4D_calcQOIs(ds,mean_dim,data_type='wrfout', mean_opt='static', lowess_d
                         lowess_smth[:,kk,jj,ii] = lowess_mean(var[:,jj,ii], 
                                                          win_size=lowess_window,
                                                          delta=lowess_delta)
-                print('k-loop: {} seconds'.format(time.time()-k_loop_start))
+                print(f'k-loop: {time.time() - k_loop_start} seconds')
                 loop_end = time.time()
-            print('total time: {} seconds'.format(loop_end - loop_start))
+            print(f'total time: {loop_end - loop_start} seconds')
             if init_ds_means:
                 ds_means = xr.Dataset({varn:(['datetime','nz','ny','nx'], lowess_smth)},
                                        coords=ds.coords)
@@ -559,11 +548,11 @@ def model4D_spectra(ds,spectra_dim,average_dim,vert_levels,horizontal_locs,fld,f
         dt = ds.attrs['DX']
     elif spectra_dim == 'datetime':
         dt = float(ds.datetime[1].data - ds.datetime[0].data)/1e9
-        
+
     fs = 1 / dt
     overlap = 0
     win = hamming(nblock, True) #Assumed non-periodic in the spectra_dim
-    
+
     init_Puuf_cum = True
 
     for cnt_lvl,level in enumerate(vert_levels): # loop over levels
@@ -576,12 +565,12 @@ def model4D_spectra(ds,spectra_dim,average_dim,vert_levels,horizontal_locs,fld,f
             for cnt,it in enumerate(range(ds.dims[average_dim])): # loop over y
                 if spectra_dim == 'datetime':
                     series = series_lvl.isel(nx=iLoc,ny=it)
-                    if (type(series) == xr.Dataset) or (type(series) == xr.DataArray):
+                    if type(series) in [xr.Dataset, xr.DataArray]:
                         series = series.to_dataframe()
                         for key in series.keys():
                             if key != 'varn':
                                 series = series.drop([key],axis=1)
-                    
+
                 elif 'y' in spectra_dim:
                     series = series_lvl.isel(nx=iLoc,datetime=it)
                 else:
@@ -589,7 +578,7 @@ def model4D_spectra(ds,spectra_dim,average_dim,vert_levels,horizontal_locs,fld,f
                 #f, Pxxfc = welch(series, fs, window=win, noverlap=overlap, 
                 #                 nfft=nblock, return_onesided=False, detrend='constant')
                 #Pxxf = np.multiply(np.real(Pxxfc),np.conj(Pxxfc))
-                
+
                 Pxxf = power_spectral_density(series,window_type=win,detrend='constant')
                 if it == 0:
                     if init_Puuf_cum:
@@ -1001,7 +990,7 @@ def estimate_ABL_height(T=None,Tw=None,uw=None,sanitycheck=True,**kwargs):
     elif Tw is not None:
         ablh = Tw.unstack().idxmin(axis=1)
         if sanitycheck:
-            Tw_at_ablh = Tw.loc[[(t,z) for t,z in ablh.iteritems()]]
+            Tw_at_ablh = Tw.loc[list(ablh.iteritems())]
             assert np.all(Tw_at_ablh <= 0)
     elif uw is not None:
         # assume the turbulent stress maxima occur near the surface and
@@ -1014,9 +1003,9 @@ def estimate_ABL_height(T=None,Tw=None,uw=None,sanitycheck=True,**kwargs):
         z_near0 = z_near0.fillna(method='bfill').fillna(method='ffill')
         # get near-zero value of uw for extrapolation
         uw_norm = uw_norm.stack(dropna=False)
-        uw_norm_near0 = uw_norm.loc[[(t,z) for t,z in z_near0.iteritems()]]
+        uw_norm_near0 = uw_norm.loc[list(z_near0.iteritems())]
         if sanitycheck:
-            assert np.all(uw_norm_near0.loc[~pd.isna(uw_norm_near0)] >= 0) 
+            assert np.all(uw_norm_near0.loc[~pd.isna(uw_norm_near0)] >= 0)
         # extrapolate
         ablh = z_near0 / (1 - uw_norm_near0)
         ablh = ablh.reset_index(level=1)[0]
@@ -1059,7 +1048,7 @@ def get_nc_file_times(f_dir,
         time_fmt : str
             (Default '%Y%m%d') Format for the datetime in file.
     '''
-    files = sorted(glob.glob('{}{}'.format(f_dir,f_grep_str)))
+    files = sorted(glob.glob(f'{f_dir}{f_grep_str}'))
     num_files = len(files)
     file_times = {}
 
@@ -1075,17 +1064,16 @@ def get_nc_file_times(f_dir,
             assert len(f_split) == len(time_pos), 'f_split (how to parse the file name) and time_pos (index of time string is after split) must be same size.'
             for split,pos in zip(f_split,time_pos):
                 f_name = f_name.split(split)[pos]
-            
+
             f_time = [datetime.strptime(f_name,time_fmt)]
+        elif decode_times:
+            f_time = ncf[time_dim].data
         else:
-            if not decode_times:
-                nc_times = ncf[time_dim][:].data
-                f_time = []
-                for ff,nc_time in enumerate(nc_times):
-                    time_start = pd.to_datetime(ncf[time_dim].units.replace('seconds since ',''))            
-                    f_time.append(datetime(time_start.year, time_start.month, time_start.day) + timedelta(seconds=int(nc_time)))
-            else:
-                f_time = ncf[time_dim].data
+            nc_times = ncf[time_dim][:].data
+            f_time = []
+            for nc_time in nc_times:
+                time_start = pd.to_datetime(ncf[time_dim].units.replace('seconds since ',''))
+                f_time.append(datetime(time_start.year, time_start.month, time_start.day) + timedelta(seconds=int(nc_time)))
         for ft in f_time:
             ft = pd.to_datetime(str(ft))
             file_times[ft] = fname

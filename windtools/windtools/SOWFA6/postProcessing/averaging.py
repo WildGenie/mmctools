@@ -65,22 +65,23 @@ class PlanarAverages(Reader):
             try:
                 self._read_heights(f)
             except IOError:
-                print('unable to read '+fpath)
+                print(f'unable to read {fpath}')
             else:
                 array = self._read_field_data(f)
         return array
 
     def _read_heights(self,f):
         line = f.readline().split()
-        assert (line[0] == 'Heights'), \
-                'Error: Expected first line to start with "Heights", but instead read'+line[0]
+        assert (
+            line[0] == 'Heights'
+        ), f'Error: Expected first line to start with "Heights", but instead read{line[0]}'
 
         self.hLevelsCell = [ float(val) for val in line[2:] ]
         f.readline()
 
         if (len(self._processed) > 0): # assert that all fields have same number of heights
             assert (self.N == len(self.hLevelsCell)), \
-                    'Error: Various fields do not have the same number of heights'
+                        'Error: Various fields do not have the same number of heights'
         else: # first field: set number of heights in self.N
             self.N = len(self.hLevelsCell)
         self.hLevelsCell = np.array(self.hLevelsCell)

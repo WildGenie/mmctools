@@ -106,10 +106,7 @@ def write_data(fname,
     N = dims[-1]
     if len(dims) == 1:
         patchType = 'scalar'
-        if avgValue is None:
-            avgValueStr = '0'
-        else:
-            avgValueStr = str(avgValue)
+        avgValueStr = '0' if avgValue is None else str(avgValue)
     elif len(dims) == 2:
         patchType = 'vector'
         assert(dims[0] == 3)
@@ -231,10 +228,7 @@ def read_points(fname,tol=1e-6,return_const=False,**kwargs):
 
     y,z,is_structured = get_unique_points_from_list(ylist,zlist,**kwargs)
     assert(is_structured)
-    if return_const:
-        return x0,y,z
-    else:
-        return y,z
+    return (x0, y, z) if return_const else (y, z)
 
 
 def read_vector_data(fname,Ny=None,Nz=None,order='C',verbose=False):
@@ -247,15 +241,18 @@ def read_vector_data(fname,Ny=None,Nz=None,order='C',verbose=False):
             if N is None:
                 try:
                     N = int(line)
-                    if (Ny is not None) and (Nz is not None):
-                        if not N == Ny*Nz:
-                            Ny = None
-                            Nz = None
+                    if (Ny is not None) and (Nz is not None) and N != Ny * Nz:
+                        Ny = None
+                        Nz = None
                     data = np.zeros((N,3))
                     if verbose: print('Reading',N,'vectors from',fname)
                 except ValueError: pass
-            elif not line.strip() in ['','(',')',';'] \
-                    and not line.strip().startswith('//'):
+            elif line.strip() not in [
+                '',
+                '(',
+                ')',
+                ';',
+            ] and not line.strip().startswith('//'):
                 data[iread,:] = [ float(val) for val in line.strip().strip('()').split() ]
                 iread += 1
     assert(iread == N)
@@ -277,33 +274,36 @@ def read_scalar_data(fname,Ny=None,Nz=None,order='C',verbose=False):
     iread = 0
     with open(fname,'r') as f:
         for line in f:
-            if (N is None) or N < 0:
+            if N is None:
                 try:
-                    if N is None: 
-                        avgval = float(line)
-                        N = -1 # skip first scalar, which is the average field value (not used)
-                    else:
-                        assert(N < 0)
-                        N = int(line) # now read the number of points
-                        if (Ny is not None) and (Nz is not None):
-                            if not N == Ny*Nz:
-                                Ny = None
-                                Nz = None
-                        data = np.zeros(N)
-                        if verbose: print('Reading',N,'scalars from',fname)
+                    avgval = float(line)
+                    N = -1 # skip first scalar, which is the average field value (not used)
                 except ValueError: pass
-            elif not line.strip() in ['','(',')',';'] \
-                    and not line.strip().startswith('//'):
+            elif N < 0:
+                try:
+                    assert(N < 0)
+                    N = int(line) # now read the number of points
+                    if (Ny is not None) and (Nz is not None) and N != Ny * Nz:
+                        Ny = None
+                        Nz = None
+                    data = np.zeros(N)
+                    if verbose: print('Reading',N,'scalars from',fname)
+                except ValueError: pass
+            elif line.strip() not in [
+                '',
+                '(',
+                ')',
+                ';',
+            ] and not line.strip().startswith('//'):
                 data[iread] = float(line)
                 iread += 1
     assert(iread == N)
 
-    if (Ny is not None) and (Nz is not None):
-        scalarField = data.reshape((Ny,Nz),order=order)
-    else:
-        scalarField = data
-
-    return scalarField
+    return (
+        data.reshape((Ny, Nz), order=order)
+        if (Ny is not None) and (Nz is not None)
+        else data
+    )
 
 
 class BoundaryData(object):
@@ -324,9 +324,7 @@ class BoundaryData(object):
         self.t = np.array(self.ts.times)
         self.Ntimes = self.ts.Ntimes
 
-        kwargs = {}
-        if (Ny is not None) and (Nz is not None):
-            kwargs = dict(Ny=Ny, Nz=Nz)
+        kwargs = dict(Ny=Ny, Nz=Nz) if (Ny is not None) and (Nz is not None) else {}
         self.y, self.z = read_points(os.path.join(bdpath,'points'), **kwargs)
         self.Ny = len(self.y)
         self.Nz = len(self.z)
@@ -498,7 +496,7 @@ class CartesianPatch(object):
         if fpath is None:
             fpath = os.path.join(self.dpath,self.name,'points')
         write_points(fpath,self.X,self.Y,self.Z,patchName=self.name)
-        print('Wrote points to '+fpath)
+        print(f'Wrote points to {fpath}')
 
     def write_profiles(self, t, z,
                        U=None, V=None, W=None, T=None, k=None,
@@ -533,9 +531,9 @@ class CartesianPatch(object):
         if len(U.shape) == 2:
             have_components = True
             assert(np.all(U.shape == (Nt,Nz)) and \
-                    np.all(V.shape == (Nt,Nz)) and \
-                    np.all(W.shape == (Nt,Nz)) and \
-                    np.all(T.shape == (Nt,Nz)))
+                        np.all(V.shape == (Nt,Nz)) and \
+                        np.all(W.shape == (Nt,Nz)) and \
+                        np.all(T.shape == (Nt,Nz)))
         elif len(U.shape) == 3:
             have_components = False
             assert(U.shape[2] == 3)
@@ -556,12 +554,7 @@ class CartesianPatch(object):
         if time_range[1] is None:
             time_range[1] = 9e9
 
-        if (not len(self.z) == Nz) or (not np.all(self.z == z)):
-            interpolate = True
-        else:
-            # input z are equal to patch z
-            interpolate = False
-
+        interpolate = len(self.z) != Nz or not np.all(self.z == z)
         Upatch = np.zeros((self.Nx,self.Ny,self.Nz))
         Vpatch = np.zeros((self.Nx,self.Ny,self.Nz))
         Wpatch = np.zeros((self.Nx,self.Ny,self.Nz))
@@ -570,7 +563,7 @@ class CartesianPatch(object):
         for it,ti in enumerate(t):
             if (ti < time_range[0]) or (ti > time_range[1]):
                 if verbose:
-                    print('skipping time '+str(ti))
+                    print(f'skipping time {str(ti)}')
                 continue
             tname = '{:f}'.format(ti).rstrip('0').rstrip('.')
 
@@ -605,14 +598,14 @@ class CartesianPatch(object):
                     Tpatch[:,:,iz] = T[it,iz]
                     if k is not None:
                         kpatch[:,:,iz] = k[it,iz]
-        
+
             Upath = os.path.join(timepath,'U')
             Udata = np.stack((Upatch.ravel(), Vpatch.ravel(), Wpatch.ravel()))
-            if verbose: print('writing data to {:s}'.format(Upath)) 
+            if verbose: print('writing data to {:s}'.format(Upath))
             write_data(Upath, Udata, patchName=self.name, timeName=ti)
 
             Tpath = os.path.join(timepath,'T')
-            if verbose: print('writing data to {:s}'.format(Tpath)) 
+            if verbose: print('writing data to {:s}'.format(Tpath))
             write_data(Tpath, Tpatch.ravel(), patchName=self.name, timeName=ti)
 
             if k is not None:

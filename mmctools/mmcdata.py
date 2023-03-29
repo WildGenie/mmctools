@@ -87,12 +87,11 @@ class MMCData():
         data = []
         while True:
             recordheader = read_ascii_recordheader(f);
-            if (len(recordheader)==0) or (recordheader is None): #is recordheader={} or Null value? if so break, otherwise read a record
+            if (len(recordheader)==0) or (recordheader is None):
                 break
-            else:  
-                recordarray = read_ascii_records(f,self.description['levels'])
-                data.append([recordheader, recordarray])
-                self.dataSetLength += 1
+            recordarray = read_ascii_records(f,self.description['levels'])
+            data.append([recordheader, recordarray])
+            self.dataSetLength += 1
         return data
 
     def _process_data(self,data,convert_ft_to_m=False,specified_date=None,map_to_met_coords=False):
@@ -304,29 +303,29 @@ class MMCData():
         model_std = np.std(modelData,axis=0)
         #Find the x-axis Min,Max, and Interval
         deltaXp = np.nanmax(np.append(np.abs(np.nanmax(np.mean(obsData,axis=0))- \
-                                             np.nanmax(np.mean(modelData,axis=0))) \
-                             ,np.nanmax(obs_std)))
+                                                 np.nanmax(np.mean(modelData,axis=0))) \
+                                 ,np.nanmax(obs_std)))
         deltaXm = np.nanmax(np.append(np.abs(np.nanmin(np.mean(obsData,axis=0))- \
-                                             np.nanmin(np.mean(modelData,axis=0))) \
-                             ,np.nanmax(obs_std)))
+                                                 np.nanmin(np.mean(modelData,axis=0))) \
+                                 ,np.nanmax(obs_std)))
         deltaX = np.nanmax(np.append(deltaXp,deltaXm))
         xTickMin = np.floor(np.nanmin(np.mean(obsData,axis=0))-deltaX)
         xTickMax = np.ceil(np.nanmax(np.mean(obsData,axis=0))+deltaX)
         xTickInterval = np.round_((xTickMax-xTickMin)/3.0,0)
         #print the x-axis characteristics
         print('{:s}'.format(fldString+" x-axis traits..."))
-        print('{:s}'.format("xTickMin ="+str(xTickMin)))
-        print('{:s}'.format("xTickMax ="+str(xTickMax)))
-        print('{:s}'.format("xTickInterval ="+str(xTickInterval)))
+        print('{:s}'.format(f"xTickMin ={str(xTickMin)}"))
+        print('{:s}'.format(f"xTickMax ={str(xTickMax)}"))
+        print('{:s}'.format(f"xTickInterval ={str(xTickInterval)}"))
         #Setup the x-axis ticks and labels
         xticks=np.arange(xTickMin,xTickMax+xTickInterval,xTickInterval)
         xlabels=[]
         xlabels.extend(str(u).split('.')[0] for u in xticks.tolist())
         #Plot the observations (and uncertainty via errorbars)
         axs.errorbar(np.mean(obsData,axis=0), obsIndepVar, xerr=obs_std, capsize=2, \
-                     label=obsLabel, **obs_marker_style)
+                         label=obsLabel, **obs_marker_style)
         axs.errorbar(np.mean(modelData,axis=0), modelIndepVar, xerr=model_std, capsize=2, \
-                     label=modelLabel, **model_marker_style)
+                         label=modelLabel, **model_marker_style)
         #axs.plot(np.mean(modelData,axis=0), modelIndepVar, \
         #         label=modelLabel, **model_marker_style)
         axs.set(xticks=xticks,xticklabels=xlabels,yticks=yticks,yticklabels=ylabels)
@@ -385,19 +384,17 @@ def read_ascii_header(f):
     levels = int(head9[12:25].strip())
     print("levels: {:d}".format(levels))
 
-    fileheader = {
-        'lab':lab,
-        'location':location,
-        'latitude':latitude,
-        'longitude':longitude,
-        'codename':codename,
-        'codetype':codetype,
-        'casename':casename,
-        'benchmark':benchmark,
-        'levels':levels,
+    return {
+        'lab': lab,
+        'location': location,
+        'latitude': latitude,
+        'longitude': longitude,
+        'codename': codename,
+        'codetype': codetype,
+        'casename': casename,
+        'benchmark': benchmark,
+        'levels': levels,
     }
-
-    return fileheader
 
 def read_ascii_recordheader(f):
     """Read a record from legacy MMC file, called by _read_ascii()"""
@@ -460,17 +457,11 @@ def read_ascii_records(f,Nlevels):
     by _read_ascii().
     """
     record=[]
-    for i in range(Nlevels):
+    for _ in range(Nlevels):
         line = f.readline()
         #data = map(float,line.split())
-        for data in map(float,line.split()):
-            record.append(data)
-        #print("len(data) = {:d}",len(data))
-        #record.append(data)
-        #print("len(record) = {:d}",len(record))
-    recordarray=np.array(record).reshape(Nlevels,floor(len(record)/Nlevels))
-    #print("recordarray.shape = ",recordarray.shape)
-    return recordarray
+        record.extend(iter(map(float,line.split())))
+    return np.array(record).reshape(Nlevels,floor(len(record)/Nlevels))
 
 
 ### Utility functions for MMC class
@@ -503,21 +494,20 @@ def running_mean(x, N):
     y = x
     cumsum = np.cumsum(np.insert(x, 0, 0))
     xavg = (cumsum[N:] - cumsum[:-N]) / N
-    for i in range(0,floor(N/2)):
+    for i in range(floor(N/2)):
         xavg = np.insert(xavg,i,np.nanmean(y[i:i+N]))
     for i in range(M-floor(N/2)+1,M):
         xavg = np.append(xavg,np.nanmean(y[i-N:i]))
     return xavg
 
 def running_mean2(x,N):
-    xavg=[]
     M=len(x)
-    for i in range(0,floor(N/2)):
-        xavg.append(np.nanmean(x[i:i+N]))
-    for i in range(floor(N/2),M-floor(N/2)):
-        xavg.append(np.nanmean(x[i-floor(N/2):i+floor(N/2)]))
-    for i in range(M-floor(N/2),M):
-        xavg.append(np.nanmean(x[i-N:i]))
+    xavg = [np.nanmean(x[i:i+N]) for i in range(floor(N/2))]
+    xavg.extend(
+        np.nanmean(x[i - floor(N / 2) : i + floor(N / 2)])
+        for i in range(floor(N / 2), M - floor(N / 2))
+    )
+    xavg.extend(np.nanmean(x[i-N:i]) for i in range(M-floor(N/2),M))
     return xavg
 
 

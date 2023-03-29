@@ -57,7 +57,7 @@ with open(os.path.join(dpath,'system','controlDict'),'r') as f:
 
 if len(sys.argv) == 1:
     import glob
-    logfiles = glob.glob('log.*'+app)
+    logfiles = glob.glob(f'log.*{app}')
     logfiles.sort()
     fpath = logfiles[-1]
 
@@ -84,9 +84,9 @@ try:
                 cflmax = float(line.split()[-1])
                 CourantMax.append(cflmax)
 except NameError:
-    sys.exit('USAGE: '+sys.argv[0]+' log_file')
+    sys.exit(f'USAGE: {sys.argv[0]} log_file')
 except IOError:
-    sys.exit('Problem reading '+fpath)
+    sys.exit(f'Problem reading {fpath}')
 
 completed = (curTime-startTime) / (endTime-startTime)
 
@@ -136,7 +136,7 @@ print(time.strftime('Current date/time is %x %X'))
 
 if writehist:
     N = min(len(simTimes),len(ctime_per_step))
-    with open(fpath+'.timing','w') as f:
+    with open(f'{fpath}.timing', 'w') as f:
         f.write(time.strftime('# Current system time: %x %X\n'))
         f.write('# step  simulation_time  wallclock_time_per_step\n')
         for i in range(N):

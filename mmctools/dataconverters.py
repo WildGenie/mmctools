@@ -13,7 +13,7 @@ def convertMMCToPickle(pathbase,year,dataDir,pklDir):
     outpath = os.path.join(pathbase,year,pklDir)
     inDirContents = os.listdir(inpath)
     print("inpath: {:s}".format(inpath))
-    print("--contains: {:d} files/directories".format(len(inDirContents)))    
+    print("--contains: {:d} files/directories".format(len(inDirContents)))
     for item in inDirContents:
         print("\t{:s}".format(item))
     print("\n")
@@ -29,15 +29,14 @@ def convertMMCToPickle(pathbase,year,dataDir,pklDir):
                 raise IOError('input file has neither .dat nor .txt extension. Bailing out!!\n')
             else:
                 name,_ = os.path.splitext(fpath)
-            if(name+".pkl" in outDirContents):
-                print("MMC file-- "+fname+" already pkl-ized!\n")
+            if f"{name}.pkl" in outDirContents:
+                print(f"MMC file-- {fname}" + " already pkl-ized!\n")
             else:
                 db = MMCData(pklfile=fpath)
-                outfile = os.path.join(outpath,name+".pkl")
-                outfptr = open(outfile,'wb')
-                pickle.dump(db,outfptr)
-                outfptr.close()
-                print("MMC file-- "+fname+" now pkl-ized!\n")
+                outfile = os.path.join(outpath, f"{name}.pkl")
+                with open(outfile,'wb') as outfptr:
+                    pickle.dump(db,outfptr)
+                print(f"MMC file-- {fname}" + " now pkl-ized!\n")
     print("Done pkl-izing input files! ")
     print("outpath: {:s}".format(outpath))
     outDirContents = os.listdir(outpath)
@@ -63,13 +62,12 @@ def convertMMCToXarrayNCDF(pathbase,year,dataDir,ncDir, **kwargs):
             print("STOP! You may need to manually recurse subdirectory-- {:s}\n".format(fname))
         else:
             print("xarray/netcdf-izing MMC file-- {:s}".format(fname))
-            if (not fname.endswith('.dat')) and (not fname.endswith('.txt')):
+            if not fname.endswith('.dat') and not fname.endswith('.txt'):
                 raise IOError('input file has neither .dat nor .txt extension. Bailing out!!\n')
-            else:
-                name,fileExtension = os.path.splitext(fpath)
-                print(fileExtension)
-            if(name+".nc" in outDirContents):
-                print("MMC file-- "+fname+" already xarray/netcdf-ized!\n")
+            name,fileExtension = os.path.splitext(fpath)
+            print(fileExtension)
+            if f"{name}.nc" in outDirContents:
+                print(f"MMC file-- {fname}" + " already xarray/netcdf-ized!\n")
             else:
                 db = MMCData(asciifile=fpath, **kwargs)
                 #Now make an xarrays object out of the db-dictionary/database
@@ -81,7 +79,7 @@ def convertMMCToXarrayNCDF(pathbase,year,dataDir,ncDir, **kwargs):
                                encoding={
                                   'datetime':{'units': 'seconds since 1970-01-01 00:00:00.0'}
                                })
-                print("MMC file-- "+fname+" now xarray'd!\n")
+                print(f"MMC file-- {fname}" + " now xarray'd!\n")
     print("Done xarray/netcdf-izing input files! ")
     print("outpath: {:s}".format(outpath))
     outDirContents = os.listdir(outpath)

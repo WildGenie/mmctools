@@ -189,17 +189,17 @@ class InternalCoupling(object):
         # set missing fields to zero
         fieldNames = [xmom, ymom, temp]
         for field in fieldNames:
-            if not field in df.columns:
+            if field not in df.columns:
                 df.loc[:,field] = 0.0
-    
+
         # extract height array
         zs = df.height.values
         nz = zs.size
-    
+
         # check data is complete
         for field in fieldNames:
             assert ~pd.isna(df[field]).any()
-    
+
         # write data to SOWFA readable file
         with open(os.path.join(self.dpath,fname),'w') as fid:
             fmt = ['    (%g',] + ['%.12g']*2 + ['%.12g)',]
@@ -386,11 +386,8 @@ class BoundaryCoupling(object):
             assert dim in expected_dims, f'missing dim {dim}'
             coord = self.ds.coords[dim]
             assert (coord.dims[0] == dim) and (len(coord.dims) == 1), \
-                    f'{dim} is not a dimension coordinate'
-        # Only handle a single boundary plane at a time; boundaries
-        # should be aligned with the Cartesian axes
-        constdims = [dim for dim in self.ds.dims if self.ds.dims[dim]==1]
-        if len(constdims) > 0:
+                        f'{dim} is not a dimension coordinate'
+        if constdims := [dim for dim in self.ds.dims if self.ds.dims[dim] == 1]:
             assert (len(constdims) == 1), 'more than one constant dim'
             constdim = constdims[0]
         else:
@@ -438,7 +435,7 @@ class BoundaryCoupling(object):
             dim for dim in ['x','y','height']
             if (dim in dims) and self.ds.dims[dim] > 1
         ]
-        assert (len(self.bndry_dims) == 2), f'boundary patch dims: {str(self.bndry_dims)}'
+        assert (len(self.bndry_dims) == 2), f'boundary patch dims: {self.bndry_dims}'
         # write out patch/points
         if points:
             self._write_points(binary=binary, gzip=gzip)
@@ -446,8 +443,9 @@ class BoundaryCoupling(object):
         for fieldname,dvars in fields.items():
             if isinstance(dvars, (list,tuple)):
                 # vector
-                assert all([dvar in self.ds.variables for dvar in dvars]), \
-                        'Dataset does not contain all of '+str(dvars)
+                assert all(
+                    dvar in self.ds.variables for dvar in dvars
+                ), f'Dataset does not contain all of {str(dvars)}'
                 assert (len(dvars) == 3)
                 self._write_boundary_vector(fieldname, components=dvars,
                                             binary=binary, gzip=gzip)
@@ -458,12 +456,11 @@ class BoundaryCoupling(object):
                                             binary=binary, gzip=gzip)
 
     def _open(self,fpath,fopts,gzip=False):
-        if gzip:
-            if not fpath.endswith('.gz'):
-                fpath += '.gz'
-            return gz.open(fpath, fopts)
-        else:
+        if not gzip:
             return open(fpath, fopts)
+        if not fpath.endswith('.gz'):
+            fpath += '.gz'
+        return gz.open(fpath, fopts)
 
     def _write_points(self,fname='points',binary=False,gzip=False):
         x,y,z = np.meshgrid(self.ds.coords['x'],
@@ -537,7 +534,7 @@ class BoundaryCoupling(object):
                     else:
                         f.write('\n(0 0 0) // average value')
             if self.verbose: 
-                print('Wrote',N,'vectors to',fpath,'at',str(tstamp))
+                print('Wrote', N, 'vectors to', fpath, 'at', tstamp)
 
     def _write_boundary_scalar(self,fname,var,binary=False,gzip=False):
         if self.constdim in self.ds.dims:
@@ -580,5 +577,5 @@ class BoundaryCoupling(object):
                     else:
                         f.write('\n0 // average value')
             if self.verbose: 
-                print('Wrote',N,'scalars to',fpath,'at',str(tstamp))
+                print('Wrote', N, 'scalars to', fpath, 'at', tstamp)
 

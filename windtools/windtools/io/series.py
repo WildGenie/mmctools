@@ -8,9 +8,9 @@ def pretty_list(strlist,indent=2,sep='\t',width=80):
     """For formatting long lists of strings of arbitrary length
     """
     sep = sep.expandtabs()
-    max_item_len = max([len(s) for s in strlist])
+    max_item_len = max(len(s) for s in strlist)
     items_per_line = int((width - (indent+max_item_len)) / (len(sep)+max_item_len) + 1)
-    Nlines = int(len(strlist) / items_per_line)
+    Nlines = len(strlist) // items_per_line
     extraline = (len(strlist) % items_per_line) > 0
     fmtstr = '{{:{:d}s}}'.format(max_item_len)
     strlist = [ fmtstr.format(s) for s in strlist ] # pad strings so that they're all the same length
@@ -61,19 +61,21 @@ class Series(object):
         return zip(self.times,self.filelist)
 
     def trimtimes(self,tstart=None,tend=None):
-        if (tstart is not None) or (tend is not None):
-            if tstart is None: tstart = 0.0
-            if tend is None: tend = 9e9
-            selected = [ (t >= tstart) & (t <= tend) for t in self.times ]
-            self.filelist = [self.filelist[i] for i,b in enumerate(selected) if b ]
-            self.times = [self.times[i] for i,b in enumerate(selected) if b ]
-            self.Ntimes = len(self.times)
+        if tstart is None:
+            if tend is None:
+                return
+            tstart = 0.0
+        if tend is None: tend = 9e9
+        selected = [ (t >= tstart) & (t <= tend) for t in self.times ]
+        self.filelist = [self.filelist[i] for i,b in enumerate(selected) if b ]
+        self.times = [self.times[i] for i,b in enumerate(selected) if b ]
+        self.Ntimes = len(self.times)
 
-            # for SOWFATimeSeries:
-            try:
-                self.dirlist = [self.dirlist[i] for i,b in enumerate(selected) if b ]
-            except AttributeError:
-                pass
+        # for SOWFATimeSeries:
+        try:
+            self.dirlist = [self.dirlist[i] for i,b in enumerate(selected) if b ]
+        except AttributeError:
+            pass
 
 
 class TimeSeries(Series):
@@ -118,8 +120,8 @@ class TimeSeries(Series):
 
         for f in os.listdir(self.datadir):
             if (check_path(os.path.join(self.datadir,f))) \
-                    and f.startswith(prefix) \
-                    and f.endswith(suffix):
+                        and f.startswith(prefix) \
+                        and f.endswith(suffix):
                 fpath = os.path.join(self.datadir,f)
                 self.filelist.append(fpath)
                 val = f[len(prefix):]
@@ -129,8 +131,8 @@ class TimeSeries(Series):
                     self.times.append(t0 + dt*float(val))
                 except ValueError:
                     print('Prefix and/or suffix are improperly specified')
-                    print('  attempting to cast value: '+val)
-                    print('  for file: '+fpath)
+                    print(f'  attempting to cast value: {val}')
+                    print(f'  for file: {fpath}')
                     break
         self.Ntimes = len(self.filelist)
         if self.Ntimes == 0:
@@ -181,7 +183,7 @@ class SOWFATimeSeries(Series):
             self.times.append(tval)
             self.dirlist.append(path)
         self.Ntimes = len(self.dirlist)
-    
+
         # sort by output time
         iorder = [kv[0] for kv in sorted(enumerate(self.times),key=lambda x:x[1])]
         self.dirlist = [self.dirlist[i] for i in iorder]
@@ -190,7 +192,7 @@ class SOWFATimeSeries(Series):
         # check that all subdirectories contain the same files
         self.timenames = os.listdir(self.dirlist[0])
         for d in self.dirlist:
-            if not os.listdir(d) == self.timenames:
+            if os.listdir(d) != self.timenames:
                 print('Warning: not all subdirectories contain the same files')
                 break
         if self.verbose:
@@ -201,8 +203,8 @@ class SOWFATimeSeries(Series):
             self.get(filename)
 
         # select time range
-        tstart = kwargs.get('tstart',None)
-        tend = kwargs.get('tend',None)
+        tstart = kwargs.get('tstart')
+        tend = kwargs.get('tend')
         self.trimtimes(tstart,tend)
 
     def get(self,filename):
@@ -213,14 +215,14 @@ class SOWFATimeSeries(Series):
             if os.path.isfile(fpath):
                 self.filelist.append(fpath)
             else:
-                raise IOError(fpath+' not found')
+                raise IOError(f'{fpath} not found')
 
     def outputs(self,prefix=''):
         """Print available outputs for the given data directory"""
         selected_output_names = [ name for name in self.timenames if name.startswith(prefix) ]
         if self.verbose:
             if prefix:
-                print('Files starting with "{}" in each subdirectory:'.format(prefix))
+                print(f'Files starting with "{prefix}" in each subdirectory:')
             else:
                 print('Files in each subdirectory:')
             #print('\t'.join([ '    '+name for name in selected_output_names ]))
@@ -228,5 +230,5 @@ class SOWFATimeSeries(Series):
         return selected_output_names
 
     def __repr__(self):
-        return str(self.Ntimes) + ' time subdirectories located in ' + self.datadir
+        return f'{str(self.Ntimes)} time subdirectories located in {self.datadir}'
 

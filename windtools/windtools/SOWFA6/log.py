@@ -90,7 +90,7 @@ class LogFile(object):
 
         # create data dict
         data = {}
-        if len(dt) > 0:
+        if dt:
             # adjustTimeStep is on
             data['deltaT'] = dt
         data['CoMean'] = CoMean
@@ -104,7 +104,7 @@ class LogFile(object):
 
         # trim data if needed
         datalengths = [len(arr) for _,arr in data.items()]
-        if not all([N == datalengths[0] for N in datalengths]):
+        if any(N != datalengths[0] for N in datalengths):
             Nsteps = min(datalengths)
             times = times[:Nsteps]
             for name,arr in data.items():

@@ -26,7 +26,7 @@ class LandUseTable(dict):
         """Read specified LANDUSE.TBL file"""
         with open(fpath,'r') as f:
             name = f.readline().strip()
-            while not name == '':
+            while name != '':
                 print('Reading',name)
                 self.__setitem__(name, self._read_def(f))
                 name = f.readline().strip()
@@ -38,36 +38,35 @@ class LandUseTable(dict):
         header = ['index']
         header += headerinfo[2].strip().strip("'").split()
         header += ['description']
-        newdict = dict()
+        newdict = {}
         index = pd.RangeIndex(1,Ndef+1)
-        for iseason in range(Nseason):
+        for _ in range(Nseason):
             season = f.readline().strip()
             newdict[season] = pd.DataFrame(index=index, columns=header[1:])
-            for idef in range(Ndef):
+            for _ in range(Ndef):
                 line = f.readline().split(',')
                 if len(line) < len(header):
-                    assert len(line) == len(header)-1, \
-                            'No workaround for reading '+str(line)+'... abort'
+                    assert (
+                        len(line) == len(header) - 1
+                    ), f'No workaround for reading {str(line)}... abort'
                     # workaround for rows with missing comma after index
                     line = line[0].split() + line[1:]
                 line[1:-1] = [float(val) for val in line[1:-1]]
                 line[-1] = line[-1].strip().strip("'")
-                idx = int(line[0]) 
+                idx = int(line[0])
                 newdict[season].loc[idx] = line[1:]
             # do unit conversions
             for varn, fac in conversions.items():
                 newdict[season][varn] *= fac
             # rename known abbreviations
             newdict[season].rename(columns=abbrev, inplace=True)
-            #print(newdict[season])
         if Nseason == 1:
             # return dataframe as is
             return newdict[season]
-        else:
             # return dataframe with multiindex
-            for season in newdict.keys():
-                newdict[season]['season'] = season
-            df = pd.concat(newdict.values())
-            df = df.set_index('season', append=True)
-            return df.sort_index()
+        for season in newdict:
+            newdict[season]['season'] = season
+        df = pd.concat(newdict.values())
+        df = df.set_index('season', append=True)
+        return df.sort_index()
 

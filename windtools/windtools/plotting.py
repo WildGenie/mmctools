@@ -220,7 +220,7 @@ def plot_timeheight(datasets,
     # Initialise list of colorbars
     cbars = []
 
-    # Loop over datasets, fields and times 
+    # Loop over datasets, fields and times
     for i, dfname in enumerate(args.datasets):
         df = args.datasets[dfname]
 
@@ -258,8 +258,7 @@ def plot_timeheight(datasets,
             # If available_fields is [None,], fieldname is unimportant
             if available_fields == [None]:
                 pass
-            # Else, check if field is available
-            elif not field in available_fields:
+            elif field not in available_fields:
                 print('Warning: field "'+field+'" not available in dataset '+dfname)
                 continue
 
@@ -271,11 +270,7 @@ def plot_timeheight(datasets,
                 }
 
             # Index of axis corresponding to dataset i and field j
-            if args.fieldorder=='C':
-                axi = i*nfields + j
-            else:
-                axi = j*ndatasets + i
-
+            axi = i*nfields + j if args.fieldorder=='C' else j*ndatasets + i
             # Extract data from dataframe
             fieldvalues = _get_pivoted_field(df_pivot,field)
 
@@ -284,7 +279,7 @@ def plot_timeheight(datasets,
             try:
                 plotting_properties = {**plotting_properties,**kwargs,**datasetkwargs[dfname]}
             except KeyError:
-                plotting_properties = {**plotting_properties,**kwargs}
+                plotting_properties |= kwargs
 
             # Plot data
             im = axv[axi].pcolormesh(Ts,Zs,fieldvalues.T,**plotting_properties)
@@ -311,13 +306,13 @@ def plot_timeheight(datasets,
     else:
         ax2 = None
         # Set time limits if specified
-        if not timelimits is None:
+        if timelimits is not None:
             axv[-1].set_xlim(timelimits)
         # Set time label
         for axi in axv[(nrows-1)*ncols:]:
             axi.set_xlabel('time [s]')
 
-    if not heightlimits is None:
+    if heightlimits is not None:
         axv[-1].set_ylim(heightlimits)
 
     # Add y labels
@@ -328,7 +323,7 @@ def plot_timeheight(datasets,
     _align_labels(fig,axv,nrows,ncols)
     if showcolorbars:
         _align_labels(fig,[cb.ax for cb in cbars],nrows,ncols)
-    
+
     # Number sub figures as a, b, c, ...
     if labelsubplots is not False:
         try:
@@ -336,7 +331,13 @@ def plot_timeheight(datasets,
         except (TypeError, ValueError):
             hoffset, voffset = -0.14, 1.0
         for i,axi in enumerate(axv):
-            axi.text(hoffset,voffset,'('+chr(i+97)+')',transform=axi.transAxes,size=16)
+            axi.text(
+                hoffset,
+                voffset,
+                f'({chr(i + 97)})',
+                transform=axi.transAxes,
+                size=16,
+            )
 
     # Return cbar instead of array if ntotal==1
     if len(cbars)==1:

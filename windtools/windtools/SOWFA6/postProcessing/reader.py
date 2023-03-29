@@ -56,7 +56,7 @@ class Reader(object):
             dpath = '.'
 
         if dpath[-1] == os.sep: dpath = dpath[:-1] # strip trailing slash
-        
+
         # find results
         listing = os.listdir(dpath)
         for dirname in listing:
@@ -70,7 +70,7 @@ class Reader(object):
                 self.simTimeDirs.append( dpath+os.sep+dirname )
                 self.simStartTimes.append( startTime )
 
-        if len(self.simTimeDirs) == 0:
+        if not self.simTimeDirs:
             # no time directories found; perhaps a single time directory
             # was directly specified
             dirname = os.path.split(dpath)[-1]
@@ -88,11 +88,11 @@ class Reader(object):
         self.simStartTimes.sort()
 
         # process all output dirs
-        if len(self.simTimeDirs) > 0:
+        if self.simTimeDirs:
             self._processdirs( self.simTimeDirs, **kwargs )
         else:
             print('No time directories found!')
-            
+
         self._trim_series_if_needed()
 
 
@@ -117,7 +117,7 @@ class Reader(object):
                 outputs = [varList]
         else: #specified list
             outputs = varList
-        
+
         # process all data
         selected = []
         for field in outputs:
@@ -153,7 +153,7 @@ class Reader(object):
                     selected.append(np.ones(len(tpart[-1]),dtype=bool))
                     selected = np.concatenate(selected)[:self.imax]
                     assert(len(selected) == len(newdata[:,0]))
-                elif not (len(newdata[:,0]) == len(selected)):
+                elif len(newdata[:, 0]) != len(selected):
                     # if simulation is still running, subsequent newdata may
                     # be longer
                     self.imax = min(len(selected), len(newdata[:,0]))
@@ -161,11 +161,8 @@ class Reader(object):
                     newdata = newdata[:self.imax,:]
                 # select only unique data
                 newdata = newdata[selected,:]
-            
-            if self.includeDt:
-                offset = 2
-            else:
-                offset = 1
+
+            offset = 2 if self.includeDt else 1
             # reshape field into (Nt,Nz[,Nd]) and set as attribute
             # - note: first column of 'newdata' is time
             if newdata.shape[1] == self.N+offset:
@@ -181,7 +178,7 @@ class Reader(object):
                 raise IndexError('Unrecognized number of values')
             self._processed.append(field)
             print('  read',field)        # set time arrays
-            
+
         self.t = newdata[:,0]
         self.Nt = len(self.t)
         if self.includeDt:
@@ -224,8 +221,7 @@ class Reader(object):
 
 
     def __repr__(self):
-        s = 'Times read: {:d} {:s}\n'.format(self.Nt,str(self.t))
-        s+= 'Fields read:\n'
+        s = 'Times read: {:d} {:s}\n'.format(self.Nt,str(self.t)) + 'Fields read:\n'
         for field in self._processed:
             s+= '  {:s} : {:s}\n'.format(field,
                                          str(getattr(self,field).shape))

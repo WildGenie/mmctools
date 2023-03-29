@@ -18,17 +18,19 @@ def _concat(datalist):
     if isinstance(datalist[0], (pd.Series, pd.DataFrame)):
         return pd.concat(datalist)
     elif isinstance(datalist[0], (xarray.Dataset, xarray.DataArray)):
-        dim = None
-        for timename in netcdf_time_names:
-            if timename in datalist[0].coords:
-                dim = timename
-                break
-        if dim is None:
-            print('Unable to concatenate data arrays; time dimension not one of',
-                  netcdf_time_names)
-            return datalist
-        else:
+        dim = next(
+            (
+                timename
+                for timename in netcdf_time_names
+                if timename in datalist[0].coords
+            ),
+            None,
+        )
+        if dim is not None:
             return xarray.concat(datalist, dim=dim)
+        print('Unable to concatenate data arrays; time dimension not one of',
+              netcdf_time_names)
+        return datalist
 
 
 def read_files(filelist=[],
@@ -62,7 +64,7 @@ def read_files(filelist=[],
             logging.exception('Error while reading {:s}'.format(fpath))
         else:
             dataframes.append(df)
-    if len(dataframes) == 0:
+    if not dataframes:
         print('No dataframes were read!')
         df = None
     else:
@@ -103,7 +105,7 @@ def read_dir(dpath='.',file_filter='*',
             logging.exception('Error while reading {:s}'.format(fpath))
         else:
             dataframes.append(df)
-    if len(dataframes) == 0:
+    if not dataframes:
         print('No dataframes were read!')
         df = None
     else:
@@ -136,9 +138,9 @@ def read_date_dirs(dpath='.',dir_filter='*',file_filter='*',
     dataframes = []
     dpathlist = glob.glob(os.path.join(dpath,dir_filter))
     for fullpath in sorted(dpathlist):
-        Nfiles = 0
         dname = os.path.split(fullpath)[-1]
         if os.path.isdir(fullpath):
+            Nfiles = 0
             try:
                 # check that subdirectories have the expected format
                 if expected_date_format is None:
@@ -160,8 +162,9 @@ def read_date_dirs(dpath='.',dir_filter='*',file_filter='*',
                     else:
                         dataframes.append(df)
                     Nfiles += 1
-            if verbose: print('  {} dataframes added'.format(Nfiles))
-    if len(dataframes) == 0:
+            if verbose:
+                print(f'  {Nfiles} dataframes added')
+    if not dataframes:
         print('No dataframes read from',fullpath)
         df = None
     else:

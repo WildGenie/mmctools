@@ -184,7 +184,4 @@ def covariance(a,b,interval='10min',resample=False,**kwargs):
         b_mean = b.rolling(interval).mean()
         ab_mean = (a*b).rolling(interval,**kwargs).mean()
     cov = ab_mean - a_mean*b_mean
-    if have_multiindex:
-        return cov.stack()
-    else:
-        return cov
+    return cov.stack() if have_multiindex else cov

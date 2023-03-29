@@ -34,7 +34,7 @@ class TurbSim(InflowPlane):
 
     def read_field(self,fname):
         if not fname.endswith('.bts'):
-            fname = fname + '.bts'
+            fname = f'{fname}.bts'
         self._readBTS(fname)
         self.have_field = True
 
@@ -51,7 +51,7 @@ class TurbSim(InflowPlane):
             if self.verbose: print('Reading header information from',fname)
 
             ID = f.read_int2()
-            assert( ID==7 or ID==8 )
+            assert ID in [7, 8]
             if ID==7: filetype = 'non-periodic'
             elif ID==8: filetype = 'periodic'
             else: filetype = 'UNKNOWN'
@@ -87,11 +87,10 @@ class TurbSim(InflowPlane):
                 if self.verbose:
                     print('  Umean = uhub =',self.Umean,
                           '(for calculating fluctuations)')
-            else: # user-specified Umean
-                if self.verbose:
-                    print('  Umean =',self.Umean,
-                          '(for calculating fluctuations)')
-                    print('  uhub=',self.uhub,' (NOT USED)')
+            elif self.verbose:
+                print('  Umean =',self.Umean,
+                      '(for calculating fluctuations)')
+                print('  uhub=',self.uhub,' (NOT USED)')
             if self.verbose:
                 print('  HubHt=',self.zhub,' (NOT USED)')
                 print('  Zbottom=',self.zbot)
@@ -140,7 +139,7 @@ class TurbSim(InflowPlane):
 
             if self.verbose:
                 print('  Read velocitiy fields in',time.process_time()-t0,'s')
-                            
+
             #
             # calculate dimensional velocity
             #
@@ -189,7 +188,7 @@ class GaborKS(InflowPlane):
         """Processes binary output from Gabor KS.
         """
         super(self.__class__,self).__init__(verbose,**kwargs)
-        
+
         fieldnames = ['uVel','vVel','wVel']
         self.Ncomp = 3
         if potentialTemperature is not None:
@@ -215,9 +214,8 @@ class GaborKS(InflowPlane):
             self.dt = self.dx / self.Umean
             print('Specified Umean =',self.Umean)
             print('Calculated dt =',self.dt)
-        else:
-            if self.verbose:
-                print('Specified Umean, dt =',self.Umean,self.dt)
+        elif self.verbose:
+            print('Specified Umean, dt =',self.Umean,self.dt)
 
         self.t = np.arange(self.NX)*self.dt
         self.y = np.arange(self.NY)*self.dy

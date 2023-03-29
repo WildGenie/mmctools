@@ -36,18 +36,17 @@ def write_to_netCDF(nc_filename, data,
                                            data['vardims'][vv])
             newvar[:] = data['data'][vv]
             newvar.units = data['units'][vv]
-        else:
-            if varname in core_variables:
-                newvar = ncfile.createVariable(varname,
-                                               data['vardtype'][vv],
-                                               data['vardims'][vv],
-                                               fill_value=data['fillValue'])
-                newvar[:] = data['data'][vv]
-                if verbose:
-                    print(varname)
-                    print(newvar[newvar == np.nan])
-                newvar[newvar == np.nan] = data['fillValue']
-                newvar.units = data['units'][vv]
+        elif varname in core_variables:
+            newvar = ncfile.createVariable(varname,
+                                           data['vardtype'][vv],
+                                           data['vardims'][vv],
+                                           fill_value=data['fillValue'])
+            newvar[:] = data['data'][vv]
+            if verbose:
+                print(varname)
+                print(newvar[newvar == np.nan])
+            newvar[newvar == np.nan] = data['fillValue']
+            newvar.units = data['units'][vv]
     ncfile.createDimension('nchars',19)
     newvar[:] = data['time']
     ncfile.description = data['description']

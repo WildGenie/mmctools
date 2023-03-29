@@ -17,11 +17,7 @@ if len(sys.argv) <= 1:
     sys.exit('Specify log file(s)')
 
 logfiles = sys.argv[1:]
-if len(logfiles) > 1:
-    outfile = 'combined_log.csv'
-else:
-    outfile = logfiles[0] + '.csv'
-
+outfile = 'combined_log.csv' if len(logfiles) > 1 else logfiles[0] + '.csv'
 print('Scraping log files:',logfiles)
 df = pd.concat([LogFile(fpath).df for fpath in logfiles])
 

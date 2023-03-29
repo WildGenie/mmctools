@@ -21,7 +21,7 @@ stlpath = glob.glob('constant/triSurface/*.stl')
 interp_method = 'cubic' # linear, nearest, cubic
 
 if (len(sys.argv) < 2):
-    sys.exit('USAGE: '+sys.argv[0]+' x,y [x,y] ...')
+    sys.exit(f'USAGE: {sys.argv[0]} x,y [x,y] ...')
 assert (len(stlpath) == 1), 'Did not find single stl file in constant/triSurface'
 
 print('Reading stl from',stlpath[0])
