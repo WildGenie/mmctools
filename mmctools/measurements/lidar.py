@@ -99,9 +99,10 @@ class LidarData(object):
 
     def _check_data(self):
         # check coordinates
-        if all([coord in self.df.index.names
-                for coord in ['range','azimuth','elevation']
-               ]):
+        if all(
+            coord in self.df.index.names
+            for coord in ['range', 'azimuth', 'elevation']
+        ):
             if self.verbose: print('3D volumetric scan loaded')
         elif 'range' not in self.df.index.names:
             if self.verbose: print('Vertical scan loaded')
@@ -112,7 +113,9 @@ class LidarData(object):
             if self.verbose: print('PPI scan loaded')
             self.PPI = True
         else:
-            raise IndexError('Unexpected index levels in dataframe: '+str(self.df.index.names))
+            raise IndexError(
+                f'Unexpected index levels in dataframe: {str(self.df.index.names)}'
+            )
         # check ranges
         rarray = self.df.index.levels[0]
         dr = rarray[1] - rarray[0]
@@ -271,10 +274,7 @@ class GalionCornellPEIWEE(LidarData):
               range_gate_size=30.):
         """Process a single scan in netcdf format
         """
-        if isinstance(fpath, pd.DataFrame):
-            df = fpath.copy()
-        else:
-            df = pd.read_csv(fpath)
+        df = fpath.copy() if isinstance(fpath, pd.DataFrame) else pd.read_csv(fpath)
         df['range'] = minimum_range + df['range_gate']*range_gate_size
         df['range'] += range_gate_size/2 # shift to center of range gate
         df = df.set_index(['range','azimuth','elevation']).sort_index()

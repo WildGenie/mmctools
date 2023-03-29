@@ -158,8 +158,9 @@ def read_data(fpath, column_spec,
             df = df.drop(columns=col)
         else:
             raise TypeError('Unexpected column name/format:',(col,fmt))
-    if (len(datetime_columns) == 0) and \
-            ((datetime is None) and ((datetime_start=='') or (data_freq is None))):
+    if not datetime_columns and (
+        (datetime is None) and ((datetime_start == '') or (data_freq is None))
+    ):
         raise ValueError('No datetime data in file; need to specify datetime, or datetime_start and data_freq')
     elif (len(datetime_columns) > 0) and (datetime is not None):
         if verbose:
@@ -193,8 +194,8 @@ def read_data(fpath, column_spec,
                                            format=datetime_format)
     elif (date_name in datetime_columns) and (time_name in datetime_columns):
         # we have separate date and time columns
-        if datetime_start != '':
-            if verbose: print('Ignored specified datetime_start',datetime_start)
+        if datetime_start != '' and verbose:
+            print('Ignored specified datetime_start',datetime_start)
         date_format = column_spec[date_name]
         time_format = column_spec[time_name]
         df[datetime_name] = pd.to_datetime(df[date_name]+df[time_name],
@@ -210,7 +211,7 @@ def read_data(fpath, column_spec,
         for col in datetime_columns:
             if df[col].dtype == np.int64:
                 fmt = column_spec[col]
-                if any([s in fmt for s in test_strings]):
+                if any(s in fmt for s in test_strings):
                     for strftime_str in test_strings:
                         fmt = fmt.replace(strftime_str,'00')
                     timestrlen = len(fmt)
@@ -259,10 +260,10 @@ def read_data(fpath, column_spec,
         df = df.set_index(datetime_name)
 
     # standard calculations
-    if not windspeed_name in column_spec.keys():
+    if windspeed_name not in column_spec.keys():
         # assume we have u,v velocity components
         df[windspeed_name] = np.sqrt(df['u']**2 + df['v']**2)
-    if not winddirection_name in column_spec.keys():
+    if winddirection_name not in column_spec.keys():
         # assume we have u,v velocity components
         df[winddirection_name] = np.degrees(np.arctan2(-df['u'],-df['v']))
         df.loc[df[winddirection_name] < 0, winddirection_name] += 360.0
@@ -272,10 +273,7 @@ def read_data(fpath, column_spec,
     except KeyError: pass
 
     #print('\n'.join(description))
-    if return_description:
-        return df, description
-    else:
-        return df
+    return (df, description) if return_description else df
 
 
 def standard_output(df,output=None,**kwargs):
@@ -301,14 +299,13 @@ def standard_output(df,output=None,**kwargs):
     df = df[output_columns].set_index(index_names)
     if output is None:
         return df
+    _,ext = os.path.splitext(output)
+    if ext == '.csv':
+        df.to_csv(output,**kwargs)
+    elif ext == '.nc':
+        df.to_xarray().to_netcdf(output,**kwargs)
     else:
-        _,ext = os.path.splitext(output)        
-        if ext == '.csv':
-            df.to_csv(output,**kwargs)
-        elif ext == '.nc':
-            df.to_xarray().to_netcdf(output,**kwargs)
-        else:
-            raise NotImplementedError('Output extension {:s} not supported'.format(ext))
+        raise NotImplementedError('Output extension {:s} not supported'.format(ext))
 
 def tilt_correction(u,v,w,
                     reg_coefs=[[]],
@@ -352,7 +349,7 @@ def tilt_correction(u,v,w,
         uf3 = -np.sin(tilt) * np.cos(tiltaz)
         ufm = np.sqrt(uf1**2 + uf2**2 + uf3**2)
         uf1 = uf1 / ufm
-        uf2 = uf2 / ufm
+        uf2 /= ufm
         uf3 = uf3 / ufm
         #vf = wf x uf
         vf1 = wf2*uf3 - wf3*uf2
@@ -364,8 +361,5 @@ def tilt_correction(u,v,w,
         u[:,lvl] = ug
         v[:,lvl] = vg
         w[:,lvl] = wg
-    if Nt == 1:
-        return u.squeeze(),v.squeeze(),w.squeeze()
-    else:
-        return u,v,w
+    return (u.squeeze(), v.squeeze(), w.squeeze()) if Nt == 1 else (u, v, w)
 

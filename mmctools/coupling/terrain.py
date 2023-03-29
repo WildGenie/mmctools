@@ -284,8 +284,9 @@ class SRTM(Terrain):
             latlon_bounds[2] += margin
             latlon_bounds[3] += margin
         super().__init__(latlon_bounds,fpath=fpath)
-        assert (product in self.data_products.keys()), \
-                'product should be one of '+str(list(self.data_products.keys()))
+        assert (
+            product in self.data_products.keys()
+        ), f'product should be one of {list(self.data_products.keys())}'
         self.product = product
         self.margin = margin
 
@@ -353,7 +354,7 @@ class USGS(Terrain):
 
     def _read_metadata(self,fpath):
         from xml.etree import ElementTree
-        xmlfile = os.path.splitext(fpath)[0] + '.xml'
+        xmlfile = f'{os.path.splitext(fpath)[0]}.xml'
         try:
             metadata = ElementTree.parse(xmlfile).getroot()
         except IOError:
@@ -390,9 +391,9 @@ class USGS(Terrain):
         if self.metadata.tag == 'metadata':
             # legacy metadata
             bounding = self.metadata.find('./idinfo/spdom/bounding')
-            bounds = [
-                float(bounding.find(bcdir+'bc').text)
-                for bcdir in ['west','south','east','north']
+            return [
+                float(bounding.find(f'{bcdir}bc').text)
+                for bcdir in ['west', 'south', 'east', 'north']
             ]
         else:
             # ISO XML
@@ -404,8 +405,8 @@ class USGS(Terrain):
                 'gmd:EX_Extent/gmd:geographicElement/gmd:EX_GeographicBoundingBox',
                 ISO_namespace
             )
-            bounds = [
-                float(bbox.find(f'gmd:{bound}/gco:Decimal',ISO_namespace).text)
+            return [
+                float(bbox.find(f'gmd:{bound}/gco:Decimal', ISO_namespace).text)
                 for bound in [
                     'westBoundLongitude',
                     'southBoundLatitude',
@@ -413,7 +414,6 @@ class USGS(Terrain):
                     'northBoundLatitude',
                 ]
             ]
-        return bounds
 
     def download(self):
         """This is just a stub"""
@@ -575,13 +575,13 @@ def calcVRM(hgt,res,window=None,footprint=None,fill_depressions=True,return_slop
     if footprint is not None:
         assert window is None, 'Must specify either window or footprint'
         window = np.shape(footprint)[0]
-        
+
     assert (window/2.0) - np.floor(window/2.0) != 0.0, 'window must be odd...'
     Hwndw = int(np.floor(window/2))
 
     # Type and dimension check:
     if isinstance(hgt,(xr.Dataset,xr.DataArray,xr.Variable)):
-        hgt = hgt.data    
+        hgt = hgt.data
     assert len(np.shape(hgt)) == 2, 'hgt must be 2-dimensional. Currently has {} dimensions'.format(len(np.shape(hgt)))
     ny,nx = np.shape(hgt)
 
@@ -594,7 +594,7 @@ def calcVRM(hgt,res,window=None,footprint=None,fill_depressions=True,return_slop
         rd.FillDepressions(hgt_rd, in_place=True)
     slope  = rd.TerrainAttribute(hgt_rd, attrib='slope_degrees',zscale=zscale)
     aspect = rd.TerrainAttribute(hgt_rd, attrib='aspect')
-    
+
     # Calculate vectors:
     vrm = np.zeros((ny,nx))
     rugz   = np.cos(np.deg2rad(slope))
@@ -620,10 +620,7 @@ def calcVRM(hgt,res,window=None,footprint=None,fill_depressions=True,return_slop
     else:
         num_points = float(window**2)
     vrm = 1.0 - np.sqrt(vrmX + vrmY + vrmZ)/num_points
-    if return_slope_aspect:
-        return vrm,slope,aspect
-    else:
-        return vrm
+    return (vrm, slope, aspect) if return_slope_aspect else vrm
 
 
 def calcSx(xx, yy, zagl, A, dmax, method='linear', verbose=False):
@@ -657,7 +654,7 @@ def calcSx(xx, yy, zagl, A, dmax, method='linear', verbose=False):
     npoints = 1+int(dmax/res)
     if dmax < res:
         raise ValueError('dmax needs to be larger or equal to the resolution of the grid')
-    
+
     # Get upstream direction
     A = A%360
     if    A==0:   upstreamDirX=0;  upstreamDirY=-1
@@ -679,8 +676,10 @@ def calcSx(xx, yy, zagl, A, dmax, method='linear', verbose=False):
     values = zagl.flatten()
 
     # create rotated grid. This way we sample into a interpolated grid that has the exact points we need
-    xmin = min(xx[:,0]);  xmax = max(xx[:,0])
-    ymin = min(yy[0,:]);  ymax = max(yy[0,:])
+    xmin = min(xx[:,0])
+    xmax = max(xx[:,0])
+    ymin = min(yy[0,:])
+    ymax = max(yy[0,:])
     if A%90 == 0:
         # if flow is aligned, we don't need a new grid
         xrot = xx[:,0]
@@ -695,7 +694,8 @@ def calcSx(xx, yy, zagl, A, dmax, method='linear', verbose=False):
         elevrot = griddata( points, values, (xxrot, yyrot), method=method )
 
     # create empty rotated Sx array
-    Sxrot = np.empty(np.shape(elevrot));  Sxrot[:,:] = np.nan
+    Sxrot = np.empty(np.shape(elevrot))
+    Sxrot[:,:] = np.nan
 
     for i, xi in enumerate(xrot):
         if verbose: print(f'Computing Sx... {100*(i+1)/len(xrot):.1f}%  ', end='\r')
@@ -721,17 +721,19 @@ def calcSx(xx, yy, zagl, A, dmax, method='linear', verbose=False):
 
     # interpolate results back to original grid
     pointsrot = np.array( (xxrot.flatten(), yyrot.flatten()) ).T
-    Sx = griddata( pointsrot, Sxrot.flatten(), (xx, yy), method=method )
-
-    return Sx
+    return griddata( pointsrot, Sxrot.flatten(), (xx, yy), method=method )
 
 
 def calcSxmean(xx, yy, zagl, A, dmax, method='nearest', verbose=False):
     
     Asweep = np.linspace(A-15, A+15, 7)%360
-    Sxmean = np.mean([calcSx(xx, yy, zagl, a, dmax, method, verbose=verbose) for a in Asweep ], axis=0)
-    
-    return Sxmean
+    return np.mean(
+        [
+            calcSx(xx, yy, zagl, a, dmax, method, verbose=verbose)
+            for a in Asweep
+        ],
+        axis=0,
+    )
 
 
 def calcSb(xx, yy, zagl, A, sepdist=60):
@@ -759,7 +761,7 @@ def calcSb(xx, yy, zagl, A, sepdist=60):
     
     # local Sx
     Sx1 = calcSx(xx, yy, zagl, A, dmax=sepdist)
-    
+
     # outlying Sx. Computing it at (xo, yo), and not at (xi, yi)
     xxo = xx - sepdist*np.cos(np.deg2rad(270-A))
     yyo = yy - sepdist*np.sin(np.deg2rad(270-A))
@@ -768,16 +770,12 @@ def calcSb(xx, yy, zagl, A, sepdist=60):
     zaglo = griddata( points, values, (xxo,yyo), method='linear' )
     Sx0 = calcSx(xxo, yyo, zaglo, A, dmax=1000)
 
-    Sb = Sx1 - Sx0
-    
-    return Sb
+    return Sx1 - Sx0
 
 def calcSbmean(xx, yy, zagl, A, sepdist):
     
     Asweep = np.linspace(A-15, A+15, 7)%360
-    Sbmean = np.mean([calcSb(xx, yy, zagl, a, sepdist) for a in Asweep ], axis=0)
-    
-    return Sbmean
+    return np.mean([calcSb(xx, yy, zagl, a, sepdist) for a in Asweep ], axis=0)
 
 
 def calcTPI(xx, yy, zagl, r):
@@ -861,18 +859,20 @@ def readSTL(stlpath, stlres=None, method='cubic'):
     xstl = msh.vectors[:,:,0].ravel()
     ystl = msh.vectors[:,:,1].ravel()
     zstl = msh.vectors[:,:,2].ravel()
-    
+
     # STLs are complex and the computation below may not always get the proper resolution
     apparentres = xstl[1]-xstl[0]
-    if stlres==None:
+    if stlres is None:
         print(f'Using {apparentres} m resolution obtained from the STL. This resolution may not be entirely '
                'accurate. If not, please provide a proper value using the `stlres` parameter.')
     elif stlres != apparentres:
         print(f'The {stlres} m resolution provided does not match what the function thinks the resolution is, {apparentres} '
                'm, based on the STL. This apparent resolution may not be entirely accurate. Trust yours, but verify.')
 
-    xmin = min(xstl);    xmax = max(xstl)
-    ymin = min(ystl);    ymax = max(ystl)
+    xmin = min(xstl)
+    xmax = max(xstl)
+    ymin = min(ystl)
+    ymax = max(ystl)
 
     xx, yy = np.meshgrid(np.arange(xmin,xmax+0.1, stlres), np.arange(ymin, ymax+0.1, stlres), indexing='ij')
 

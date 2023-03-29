@@ -160,7 +160,7 @@ def get_height_at_ind(wrfdata,j,i):
         z   = (zs[1:] + zs[:-1])*0.5
     else:
         zs = np.zeros((nt,nz+1))
-        for tt in range(0,nt):
+        for tt in range(nt):
             ph  = wrfdata.variables['PH'][tt,:,j,i]
             phb = wrfdata.variables['PHB'][tt,:,j,i]
             hgt = wrfdata.variables['HGT'][tt,j,i]
@@ -177,8 +177,9 @@ def get_unstaggered_var(wrfdata,varname):
         return None
     # Use dimension name to determine stagerred axis (staggered dimension name contain 'stag')
     stag_axs = [dim.endswith('_stag') for dim in _get_dim_names(wrfdata,varname)]
-    assert(stag_axs.count(True) in [0,1]), \
-        'Multiple staggered axis not supported (field ='+field+')'
+    assert stag_axs.count(True) in {0, 1}, (
+        'Multiple staggered axis not supported (field =' + field + ')'
+    )
     try:
         return unstagger(var,stag_axs.index(True))
     except ValueError:
@@ -192,14 +193,13 @@ def get_wrf_files(dpath='.',prefix='wrfout',returnFileNames=True,
     '''
     nwrffs = glob.glob(os.path.join(dpath,prefix+'*'))
     nt = np.shape(nwrffs)[0]
-    if returnFileNames==True:
-        if not fullpath:
-            nwrffs = [ os.path.split(fpath)[-1] for fpath in nwrffs ]
-        if sort:
-            nwrffs.sort()
-        return nwrffs,nt
-    else:
+    if returnFileNames != True:
         return nt
+    if not fullpath:
+        nwrffs = [ os.path.split(fpath)[-1] for fpath in nwrffs ]
+    if sort:
+        nwrffs.sort()
+    return nwrffs,nt
 
 def latlon(wrfdata):
     '''Return latitude and longitude'''
@@ -212,29 +212,32 @@ def latlon(wrfdata):
 #               TOWER UTILITIES                 #
 # - - - - - - - - - - - - - - - - - - - - - - - #
 def get_tower_header(header_line):
-    header = {'longname' : header_line[:26].strip(),
-              'domain'   : int(header_line[26:28]),
-              'tsid'     : int(header_line[28:31]),
-              'abbr'     : header_line[31:37].strip(),
-              'lat'      : float(header_line[39:46]),
-              'lon'      : float(header_line[47:55]),
-              'loci'     : int(header_line[58:62]),
-              'locj'     : int(header_line[63:67]),
-              'gridlat'  : float(header_line[70:77]),
-              'gridlon'  : float(header_line[78:86]),
-              'stationz' : float(header_line[88:94])
-             }
-    return (header)
+    return {
+        'longname': header_line[:26].strip(),
+        'domain': int(header_line[26:28]),
+        'tsid': int(header_line[28:31]),
+        'abbr': header_line[31:37].strip(),
+        'lat': float(header_line[39:46]),
+        'lon': float(header_line[47:55]),
+        'loci': int(header_line[58:62]),
+        'locj': int(header_line[63:67]),
+        'gridlat': float(header_line[70:77]),
+        'gridlon': float(header_line[78:86]),
+        'stationz': float(header_line[88:94]),
+    }
 
 
 def get_tower_names(fdir,tstr):
     '''Get the names and locations of all towers in directory (fdir)'''
-    f = open('%s%s' % (fdir,tstr))
-    nt = sum(1 for line in f)-3; f.close()
-    f = open('%s%s' % (fdir,tstr))
-    f.readline(); f.readline(); f.readline()
-    tname = []; tij = np.zeros((2,nt))
-    for tt in range(0,nt):
+    with open(f'{fdir}{tstr}') as f:
+        nt = sum(1 for _ in f) - 3
+    f = open(f'{fdir}{tstr}')
+    f.readline()
+    f.readline()
+    f.readline()
+    tname = []
+    tij = np.zeros((2,nt))
+    for tt in range(nt):
         line = f.readline().split()
         tname.append(line[1])
         tij[0,tt] = line[2]; tij[1,tt] = line[3]
@@ -243,10 +246,9 @@ def get_tower_names(fdir,tstr):
 def twrloc_ij(twr_file_name):
     '''Get the i,j location of the given tower'''
     if twr_file_name[-4:-1] == '.d0':
-        twr_file_name = '{}.TS'.format(twr_file_name)
-    twr = open(twr_file_name,'r')
-    header_line = twr.readline()
-    twr.close()
+        twr_file_name = f'{twr_file_name}.TS'
+    with open(twr_file_name,'r') as twr:
+        header_line = twr.readline()
     header = get_tower_header(header_line)
     stni = int(header['loci']) - 1
     stnj = int(header['locj']) - 1
@@ -254,9 +256,8 @@ def twrloc_ij(twr_file_name):
 
 def twrloc_ll(twr_file_name):
     '''Get the lat/lon location of the given tower'''
-    twr = open(twr_file_name,'r')
-    header = twr.readline().replace('(',' ').replace(')',' ').replace(',',' ').split()
-    twr.close()
+    with open(twr_file_name,'r') as twr:
+        header = twr.readline().replace('(',' ').replace(')',' ').replace(',',' ').split()
     stnlon = float(header[9])
     stnlat = float(header[8])
     return stnlat,stnlon
@@ -336,8 +337,7 @@ class Tower():
                 else:
                     assert (self.nz == nz), 'tower data has different number of heights'
 
-            # Read surface variables (no height component)
-            elif varn == 'TS':
+            else:
                 nv = len(line.split()) - 2
                 with open(fpath) as f:
                     # Fortran formatted output creates problems when the
@@ -372,16 +372,9 @@ class Tower():
                 if varn in staggered_vars:
                     # need to destagger these quantities
                     datadict[varn] = ((tsdata[:,1:] + tsdata[:,:-1]) / 2).ravel()
-                elif varn == 'th':
+                else:
                     # theta is a special case
                     #assert np.all(tsdata[:,-1] == TH0), 'Unexpected nonzero value for theta'
-                    # drop the trailing 0 for already unstaggered quantities
-                    datadict[varn] = tsdata[:,:-1].ravel()
-                else:
-                    # other quantities already unstaggered
-                    #if not varn == 'ww':
-                    #    # don't throw a warning if w is already unstaggered by the code
-                    #    assert np.all(tsdata[:,-1] == 0), 'Unexpected nonzero value for '+varn
                     # drop the trailing 0 for already unstaggered quantities
                     datadict[varn] = tsdata[:,:-1].ravel()
             else:
@@ -481,7 +474,7 @@ class Tower():
         # convert varname list to lower case
         varns0 = [ varn.lower() for varn in self.varns ]
         # remove excluded vars
-        varns = [ varn for varn in varns0 if not varn in exclude ]
+        varns = [varn for varn in varns0 if varn not in exclude]
         # setup index
         start_time = pd.to_datetime(start_time)
         if time_step is None:
@@ -502,10 +495,7 @@ class Tower():
         # - note 1: self.[varn].shape == self.height.shape == (self.nt, self.nz)
         # - note 2: arraydata.shape == (self.nt, len(varns)*self.nz)
         if heights is None:
-            if unstagger:
-                nz = self.nz - 1
-            else:
-                nz = self.nz
+            nz = self.nz - 1 if unstagger else self.nz
             datadict = self._create_datadict(varns,unstagger)
             if hasattr(self, height_var):
                 # heights (constant in time) were separately calculated
@@ -513,7 +503,7 @@ class Tower():
                 if unstagger:
                     z = (z[1:] + z[:-1]) / 2
                 assert (len(z.shape) == 1) and (len(z) == nz), \
-                        'tower '+height_var+' attribute should correspond to fixed height levels'
+                            'tower '+height_var+' attribute should correspond to fixed height levels'
             else:
                 # heights will be an integer index
                 z = np.arange(nz)
@@ -560,7 +550,7 @@ class Tower():
             else:
                 # interpolate for all times
                 assert zt_stag.shape == (self.nt, self.nz), \
-                        'heights should correspond to time-height indices'
+                            'heights should correspond to time-height indices'
                 datadict = {}
                 zt_unstag = (zt_stag[:,1:] + zt_stag[:,:-1]) / 2
                 for varn in varns_unstag:
@@ -694,14 +684,19 @@ def wrf_times_to_hours(wrfdata,timename='Times'):
     nt = np.shape(wrfdata.variables['Times'][:])[0]
     if nt == 1:
         time = ''.join(wrfdata.variables[timename][0])
-        year = np.float(time[:4]);    month = np.float(time[5:7])
-        day  = np.float(time[8:10]);  hour  = np.float(time[11:13])
-        minu = np.float(time[14:16]); sec   = np.float(time[17:19])
-        hours = hour + minu/60.0 + sec/(60.0*60.0)
+        year = np.float(time[:4])
+        month = np.float(time[5:7])
+        day  = np.float(time[8:10])
+        hour  = np.float(time[11:13])
+        minu = np.float(time[14:16])
+        sec   = np.float(time[17:19])
     else:
-        year = np.asarray([]); month = np.asarray([])
-        day  = np.asarray([]); hour  = np.asarray([])
-        minu = np.asarray([]); sec   = np.asarray([])
+        year = np.asarray([])
+        month = np.asarray([])
+        day  = np.asarray([])
+        hour  = np.asarray([])
+        minu = np.asarray([])
+        sec   = np.asarray([])
         for tt in np.arange(0,nt):
             time = ''.join(wrfdata.variables[timename][tt])
             year  = np.append(year,np.float(time[:4]))
@@ -710,7 +705,7 @@ def wrf_times_to_hours(wrfdata,timename='Times'):
             hour  = np.append(hour,np.float(time[11:13]))
             minu  = np.append(minu,np.float(time[14:16]))
             sec   = np.append(sec,np.float(time[17:19]))
-        hours = hour + minu/60.0 + sec/(60.0*60.0)
+    hours = hour + minu/60.0 + sec/(60.0*60.0)
     return [year,month,day,hours]
 
 def wrf_times_to_datetime(wrfdata,timename='Times',format='%Y-%m-%d_%H:%M:%S'):
@@ -740,11 +735,10 @@ def unstagger(var,axis):
 
 def add_surface_plane(var,plane=None):
     tdim,zdim,ydim,xdim = var.shape
-    if plane is None:
-        plane = np.zeros((tdim,1,ydim,xdim))
-        return np.concatenate((plane,var), axis = 1)
-    else:
+    if plane is not None:
         return np.concatenate((np.reshape(plane,(tdim,1,ydim,xdim)),var), axis = 1)
+    plane = np.zeros((tdim,1,ydim,xdim))
+    return np.concatenate((plane,var), axis = 1)
 
 def extract_column_from_wrfdata(fpath, coords,
                                 Ztop=2000., Vres=5.0,
@@ -790,17 +784,17 @@ def extract_column_from_wrfdata(fpath, coords,
     # Load WRF data
     ds = xr.open_dataset(fpath,**kwargs)
     tdim, zdim, ydim, xdim = get_wrf_dims(ds)
-    
-    
+
+
     #---------------------------
     # Preprocessing
     #---------------------------
-    
+
     # Extract WRF grid resolution
     dx_meso = ds.attrs['DX']
     assert(dx_meso == ds.attrs['DY'])
-    
-    
+
+
     # Number of additional points besides nearest grid point to perform spatial filtering
     if spatial_filter == 'interpolate':
         Nadd = 1
@@ -808,8 +802,8 @@ def extract_column_from_wrfdata(fpath, coords,
         Nadd = int(np.ceil(0.5*L_filter/dx_meso+1.0e-6)) # +eps to make sure Nadd*dxmeso > L_filter/2
     else:
         Nadd = 0
-        
-    
+
+
     # Setup microscale grid data
     site_X, site_Y, site_zonenumber, _ = utm.from_latlon(coords[0],coords[1])
 
@@ -820,14 +814,14 @@ def extract_column_from_wrfdata(fpath, coords,
     else: # 'interpolate' or 'nearest'
         xmicro = site_X
         ymicro = site_Y
-    
+
     zmicro = np.linspace(0,Ztop,1+int(Ztop/Vres))
     Zmicro, Ymicro, Xmicro = np.meshgrid(zmicro, ymicro, xmicro, indexing='ij')
 
     #2D and 3D list of points
     XYmicro = np.array((Ymicro[0,:,:].ravel(),Xmicro[0,:,:].ravel())).T
     XYZmicro = np.array((Zmicro.ravel(),Ymicro.ravel(),Xmicro.ravel())).T
-    
+
 
     # Check whether additional fields are 3D or 4D and append to corresnponding list of fields
     fieldnames_3D = default_3D_fields
@@ -846,32 +840,32 @@ def extract_column_from_wrfdata(fpath, coords,
                     fieldnames_4D.append(field)
             else:
                 raise Exception('Field "'+field+'" is not 3D or 4D, not sure how to process this field.')
-    
-    
+
+
     #---------------------------
     # Load data
     #---------------------------
-    
+
     WRFdata = {}
-    
+
     # Cell-centered coordinates
     XLAT = ds.variables['XLAT'].values     # WRF indexing XLAT[time,lat,lon]
     XLONG = ds.variables['XLONG'].values
-    
+
     # Height above ground level
     WRFdata['Zagl'],_ = get_height(ds,timevarying=True)
     WRFdata['Zagl']   = add_surface_plane(WRFdata['Zagl'])
-    
+
     # 3D fields. WRF indexing Z[tdim,ydim,xdim]
     for field in fieldnames_3D:
         WRFdata[field] = get_unstaggered_var(ds,field)
-    
+
     # 4D fields. WRF indexing Z[tdim,zdim,ydim,xdim]
     for field in fieldnames_4D:
         WRFdata[field] = get_unstaggered_var(ds,field)
         if WRFdata[field] is None:
             continue
-            
+
         # 4D field specific processing
         if field == 'T':
             # Add T0, set surface plane to TSK
@@ -893,32 +887,30 @@ def extract_column_from_wrfdata(fpath, coords,
             try:
                 fieldnames_4D.remove(name)
             except ValueError: pass
-    
-    
+
+
     #---------------------------
     # Extract site data
     #---------------------------
-    sitedata = {}
-    sitedata['Zagl'] = zmicro
-    
+    sitedata = {'Zagl': zmicro}
     # Nearest grid points to the site
     points = np.array((XLAT[0,:,:].ravel(),XLONG[0,:,:].ravel())).T
     tree = KDTree(points)
     dist, index = tree.query(np.array(coords),1) # nearest grid point
     inear = int( index % xdim )       # index to XLONG
     jnear = int((index-inear) / xdim) # index to XLAT
-    
-    
+
+
     # Extract data and apply spatial filter if necessary
     if spatial_filter == 'nearest':
         # - 3D fields
         for field in fieldnames_3D:
             sitedata[field] = WRFdata[field][:,jnear,inear]
-               
+
         # - 4D fields
         for field in fieldnames_4D:
             sitedata[field] = np.zeros((tdim,zmicro.size))
-        
+
         # Interpolate to microscale z grid at every time
         for t in range(tdim):
             Zmeso = WRFdata['Zagl'][t,:,jnear,inear].squeeze()
@@ -926,8 +918,8 @@ def extract_column_from_wrfdata(fpath, coords,
             site_data_combined = interp1d(Zmeso,wrf_data_combined,axis=0)(zmicro)
             for l, field in enumerate(fieldnames_4D):
                 sitedata[field][t,:] = site_data_combined[:,l]
-            
-            
+
+
     else: # 'interpolate' or 'average'
         # Coordinates of a subset of the WRF grid in UTM-projected cartesian system
         NN = 1+2*Nadd
@@ -938,16 +930,16 @@ def extract_column_from_wrfdata(fpath, coords,
                 Xmeso[j,i], Ymeso[j,i], _, _ = utm.from_latlon(XLAT[0,jj,ii],
                                                                XLONG[0,jj,ii],
                                                                force_zone_number = site_zonenumber)
-                
+
         Xmeso = np.repeat(Xmeso[np.newaxis, :, :], zdim+1, axis=0)
         Ymeso = np.repeat(Ymeso[np.newaxis, :, :], zdim+1, axis=0)
         XYmeso = np.array((np.ravel(Ymeso[0,:,:]),np.ravel(Xmeso[0,:,:]))).T
-        
-        
+
+
         #Initialize fields
         for field in fieldnames_3D: sitedata[field] = np.zeros((tdim))
         for field in fieldnames_4D: sitedata[field] = np.zeros((tdim,zmicro.size))
-            
+
         #Perform 3D interpolation to microscale grid for every time
         for t in range(tdim):
             # 3D fields
@@ -959,13 +951,13 @@ def extract_column_from_wrfdata(fpath, coords,
                     sitedata[field][t] = site_data_combined[0,l]
                 elif spatial_filter == 'average':
                     sitedata[field][t] = np.mean(site_data_combined[:,l])
-            
-            
+
+
             # 4D fields
             slice4d = (t,range(zdim+1),slice(jnear-Nadd,jnear+Nadd+1),slice(inear-Nadd,inear+Nadd+1))
             Zmeso = WRFdata['Zagl'][slice4d]
             XYZmeso = np.array((Zmeso.ravel(),Ymeso.ravel(),Xmeso.ravel())).T
-            
+
             wrf_data_combined  = np.array([WRFdata[field][slice4d].ravel() for field in fieldnames_4D]).T
             site_data_combined = LinearNDInterpolator(XYZmeso,wrf_data_combined)(XYZmicro)
             for l, field in enumerate(fieldnames_4D):
@@ -974,31 +966,35 @@ def extract_column_from_wrfdata(fpath, coords,
                 elif spatial_filter == 'average':
                     sitedata[field][t,:] = np.mean(site_data_combined[:,l].reshape(Zmicro.shape), axis=(1,2))
 
-                    
+
     #---------------------------
     # Store data in xarray
     #---------------------------
-    
+
     coords = {'Time': ds['XTIME'].values,
               'height': zmicro}
-    
-    data_vars = {}
-    for field in fieldnames_3D:
-        data_vars[field] = ('Time',
-                            sitedata[field],
-                            {'description': ds[field].attrs['description'].lower(),
-                             'units': ds[field].attrs['units']}
-                           )
+
+    data_vars = {
+        field: (
+            'Time',
+            sitedata[field],
+            {
+                'description': ds[field].attrs['description'].lower(),
+                'units': ds[field].attrs['units'],
+            },
+        )
+        for field in fieldnames_3D
+    }
     for field in fieldnames_4D:
         data_vars[field] = (['Time','height'],
                             sitedata[field],
                             {'description': ds[field].attrs['description'].lower(),
                              'units': ds[field].attrs['units']}
                            )
-        
-    
+
+
     xn = xr.Dataset(data_vars=data_vars,coords=coords)
-    
+
     # Rename T to theta and adjust description
     xn = xn.rename({'T':'theta'})
     xn['theta'].attrs['description'] = 'potential temperature'
@@ -1034,11 +1030,11 @@ def combine_towers(fdir, restarts, simulation_start, fname,
     assert len(simulation_start) == len(restarts), 'restarts and simulation_start are not equal'
     for rst,restart in enumerate(restarts):
         if verbose:
-            print('restart: {}'.format(restart))
+            print(f'restart: {restart}')
         data = []
         for ff in fname:
             if verbose:
-                print('starting {}'.format(ff))
+                print(f'starting {ff}')
             fpath = os.path.join(fdir,restart,ff)
             tow = Tower(fpath)
             ds = tow.to_xarray(start_time=simulation_start[rst],
@@ -1127,13 +1123,13 @@ def tsout_seriesReader(fdir,
     if type(simulation_start_time) is str:
         simulation_start_time = [simulation_start_time]*len(restarts)
     ntimes = np.shape(restarts)[0]
-    floc = '{}{}/*{}.??'.format(fdir,restarts[0],domain_of_interest)
+    floc = f'{fdir}{restarts[0]}/*{domain_of_interest}.??'
     file_list = glob.glob(floc)
-    assert file_list != [], 'No tslist files found in {}. Check kwargs.'.format(floc)
+    assert file_list != [], f'No tslist files found in {floc}. Check kwargs.'
     for ff,file in enumerate(file_list):
         file = file[:-3]
         file_list[ff] = file
-    
+
     for f in file_list: 
         if 'geo_em' in f: file_list.remove(f)
 
@@ -1141,21 +1137,26 @@ def tsout_seriesReader(fdir,
     tower_names = file_list.copy()
     for ff,file in enumerate(file_list):
         tower_names[ff] = file.split('/')[-1]
-        
+
     if not isinstance(select_tower,(list)) and select_tower is not None:
         select_tower = list(select_tower)
-            
+
     if select_tower != None:
         good_towers = []
         for twr in select_tower:
-            for twr_n in tower_names:
-                if twr in twr_n: good_towers.append(twr_n)
+            good_towers.extend(twr_n for twr_n in tower_names if twr in twr_n)
         tower_names = good_towers
-    dsF = combine_towers(fdir,restarts,simulation_start_time,tower_names,
-                         structure=structure, time_step=time_step,
-                         heights=heights, height_var=height_var,
-                         **kwargs)
-    return dsF
+    return combine_towers(
+        fdir,
+        restarts,
+        simulation_start_time,
+        tower_names,
+        structure=structure,
+        time_step=time_step,
+        heights=heights,
+        height_var=height_var,
+        **kwargs
+    )
 
 
 def wrfout_seriesReader(wrf_path,wrf_file_filter,
@@ -1222,7 +1223,7 @@ def wrfout_seriesReader(wrf_path,wrf_file_filter,
                            chunks={'Time': 10},
                            combine='nested',
                            concat_dim='Time')
-    dim_keys = ["Time","bottom_top","south_north","west_east"] 
+    dim_keys = ["Time","bottom_top","south_north","west_east"]
     horiz_dim_keys = ["south_north","west_east"]
     print('Finished opening/concatenating datasets...')
 
@@ -1256,7 +1257,7 @@ def wrfout_seriesReader(wrf_path,wrf_file_filter,
     # extract additional variables if requested
     for var in extra_vars:
         if var not in ds.data_vars:
-            print(f'Requested variable "{var}" not in {str(list(ds.data_vars))}')
+            print(f'Requested variable "{var}" not in {list(ds.data_vars)}')
             continue
         field = ds[var]
         print(f'Extracting {var}...')
@@ -1302,7 +1303,7 @@ def wrfout_seriesReader(wrf_path,wrf_file_filter,
                                      dims=dim_keys)
     ds_subset['wdir'] = xr.DataArray(180. + np.arctan2(ds_subset['u'],ds_subset['v'])*180./np.pi,
                                      dims=dim_keys)
-    
+
     # rename coord variable for time and assign ccordinates 
     ds_subset = ds_subset.rename({'XTIME': 'datetime'})  #Rename after defining the component DataArrays in the DataSet
     if specified_heights is None:
@@ -1317,7 +1318,7 @@ def wrfout_seriesReader(wrf_path,wrf_file_filter,
             ds_subset = ds_subset.swap_dims({olddim: newdim})
             dims_dict.pop(olddim)
     ds_subset = ds_subset.rename_dims(dims_dict)
-    
+
     return ds_subset
 
 
@@ -1398,18 +1399,14 @@ def wrfout_slices_seriesReader(wrf_path, wrf_file_filter,
         if specified_heights is not None:
             if len(specified_heights) == 1:
                 print("One height")
-                #print(ds.dims)
-                #print(ds.coords)
-                ds_subset['u'] = ds['SLICES_U'].sel(SLICES_Z=specified_heights)
-                ds_subset['v'] = ds['SLICES_V'].sel(SLICES_Z=specified_heights)
-                ds_subset['w'] = ds['SLICES_W'].sel(SLICES_Z=specified_heights)
-                ds_subset['T'] = ds['SLICES_T'].sel(SLICES_Z=specified_heights)
             else:
                 print("Multiple heights")
-                ds_subset['u'] = ds['SLICES_U'].sel(SLICES_Z=specified_heights)
-                ds_subset['v'] = ds['SLICES_V'].sel(SLICES_Z=specified_heights)
-                ds_subset['w'] = ds['SLICES_W'].sel(SLICES_Z=specified_heights)
-                ds_subset['T'] = ds['SLICES_T'].sel(SLICES_Z=specified_heights)
+            #print(ds.dims)
+            #print(ds.coords)
+            ds_subset['u'] = ds['SLICES_U'].sel(SLICES_Z=specified_heights)
+            ds_subset['v'] = ds['SLICES_V'].sel(SLICES_Z=specified_heights)
+            ds_subset['w'] = ds['SLICES_W'].sel(SLICES_Z=specified_heights)
+            ds_subset['T'] = ds['SLICES_T'].sel(SLICES_Z=specified_heights)
         else:
             ds_subset['u'] = ds['SLICES_U']
             ds_subset['v'] = ds['SLICES_V']
@@ -1481,54 +1478,50 @@ def write_tslist_file(fname,lat=None,lon=None,i=None,j=None,twr_names=None,twr_a
     else:
         print('Please specify either lat&lon or i&j')
         return
-    
+
     header_line = '#-----------------------------------------------#'
-    header = '{}\n{}\n{}\n'.format(header_line,header_keys,header_line)
-    
+    header = f'{header_line}\n{header_keys}\n{header_line}\n'
+
     if len(twr_locy) == len(twr_locx):
-        ntowers = len(twr_locy)  
+        ntowers = len(twr_locy)
     else:
-        print('Error - tower_x: {}, tower_y: {}'.format(len(twr_locx),len(twr_locy)))
+        print(f'Error - tower_x: {len(twr_locx)}, tower_y: {len(twr_locy)}')
         return
-    
+
     if not isinstance(twr_names,list):
-        twr_names = list(twr_names)    
-    if twr_names != None:
-        if len(twr_names) != ntowers:
-            print('Error - Tower names: {}, tower_x: {}, tower_y: {}'.format(len(twr_names),len(twr_locx),len(twr_locy)))
-            return
-    else:
-        twr_names = []
-        for twr in np.arange(0,ntowers):
-            twr_names.append('Tower{0:04d}'.format(twr+1))
-            
+        twr_names = list(twr_names)
+    if twr_names is None:
+        twr_names = ['Tower{0:04d}'.format(twr+1) for twr in np.arange(0,ntowers)]
+    elif len(twr_names) != ntowers:
+        print(
+            f'Error - Tower names: {len(twr_names)}, tower_x: {len(twr_locx)}, tower_y: {len(twr_locy)}'
+        )
+        return
     if not isinstance(twr_abbr,list):
-        twr_abbr = list(twr_abbr)                
+        twr_abbr = list(twr_abbr)
     if twr_abbr != None:
         if len(twr_abbr) != ntowers:
-            print('Error - Tower abbr: {}, tower_x: {}, tower_y: {}'.format(len(twr_abbr),len(twr_locx),len(twr_locy)))
+            print(
+                f'Error - Tower abbr: {len(twr_abbr)}, tower_x: {len(twr_locx)}, tower_y: {len(twr_locy)}'
+            )
             return
         if len(max(twr_abbr,key=len)) > 5:
             print('Tower abbreviations are too large... setting to default names')
             twr_abbr = None
-    if twr_abbr==None:
-        twr_abbr = []
-        for twr in np.arange(0,ntowers):
-            twr_abbr.append('T{0:04d}'.format(twr+1))
-            
-    f = open(fname,'w')
-    f.write(header)
-            
-    for tt in range(0,ntowers):
-        if ij_or_ll == 'ij':
-            twr_line = '{0:<26.25}{1: <6}{2: <8d} {3: <8d}\n'.format(
-                twr_names[tt], twr_abbr[tt], int(twr_locx[tt]), int(twr_locy[tt]))
-        else:
-            twr_line = '{0:<26.25}{1: <6}{2:.7s}  {3:<.8s}\n'.format(
-                twr_names[tt], twr_abbr[tt], '{0:8.7f}'.format(float(twr_locy[tt])), 
-                                             '{0:8.7f}'.format(float(twr_locx[tt])))
-        f.write(twr_line)
-    f.close()
+    if twr_abbr is None:
+        twr_abbr = ['T{0:04d}'.format(twr+1) for twr in np.arange(0,ntowers)]
+    with open(fname,'w') as f:
+        f.write(header)
+
+        for tt in range(ntowers):
+            if ij_or_ll == 'ij':
+                twr_line = '{0:<26.25}{1: <6}{2: <8d} {3: <8d}\n'.format(
+                    twr_names[tt], twr_abbr[tt], int(twr_locx[tt]), int(twr_locy[tt]))
+            else:
+                twr_line = '{0:<26.25}{1: <6}{2:.7s}  {3:<.8s}\n'.format(
+                    twr_names[tt], twr_abbr[tt], '{0:8.7f}'.format(float(twr_locy[tt])), 
+                                                 '{0:8.7f}'.format(float(twr_locx[tt])))
+            f.write(twr_line)
         
         
 
@@ -1541,10 +1534,10 @@ import time
 import matplotlib.colors as colors
 
 def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=100):
-    new_cmap = colors.LinearSegmentedColormap.from_list(
+    return colors.LinearSegmentedColormap.from_list(
         'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap.name, a=minval, b=maxval),
-        cmap(np.linspace(minval, maxval, n)))
-    return new_cmap
+        cmap(np.linspace(minval, maxval, n)),
+    )
 
 class ErrorWatch():
     
@@ -1559,10 +1552,10 @@ class ErrorWatch():
         terrain_cmap = truncate_colormap(plt.cm.terrain,minval=0.25)
         terrain_cmap.set_bad('steelblue')
 
-        
+
         if working_dir is None:
             raise ValueError('working_dir must be specified')
-            
+
         print('Getting information about the run...')
         datetime_dict = self.get_run_information(working_dir)
 
@@ -1573,22 +1566,24 @@ class ErrorWatch():
         print('Initializing the CFL dataset...')
         cfl_ds = self.initialize_dataset(datetime_dict[domain_of_interest],domain_of_interest)
         last_time_step = cfl_ds.datetime[0].data
-        
+
         print('Getting CFL information...')
         cfl_ds,rsl_dict,last_time_step = self.grep_error_logs(cfl_ds,rsl_loc=working_dir,last_time_step=last_time_step)
         self.cfl_ds = cfl_ds
 
-        
+
         sim_running = self.check_run_status(cfl_ds)
         if show_plot:
             fig = plt.figure(figsize=(9,9))#,constrained_layout=True)
             plt.subplots_adjust(hspace=0.8)
             self.error_watch_plot(fig,cmap=terrain_cmap)
-        
+
         sim_finished_when_starting = True
-        
+
         if sim_running:
-            print('It appears the simulation is still running... refreshing every {} seconds'.format(wait_time))
+            print(
+                f'It appears the simulation is still running... refreshing every {wait_time} seconds'
+            )
             need_to_iterate = True
         else:
             need_to_iterate = False
@@ -1609,8 +1604,8 @@ class ErrorWatch():
             if need_to_iterate:
                 self.error_watch_plot(fig,cmap=terrain_cmap)
             plt.show()
-            
-        print('The simulation has stopped. Result: {}'.format(cfl_ds.status))
+
+        print(f'The simulation has stopped. Result: {cfl_ds.status}')
 
 
         

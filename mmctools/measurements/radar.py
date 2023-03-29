@@ -88,6 +88,7 @@ def profiler(fname,scans=None,
             scantypes.append(newscan)
             scantypeid = len(scantypes)-1
         return scantypeid
+
     with open(fname,'r') as f:
         if scans is not None:
             if hasattr(scans,'__iter__'):
@@ -145,7 +146,7 @@ def profiler(fname,scans=None,
                 matches = [col]
             else:
                 matches = [ c for c in df.columns if c.startswith(col+'.') ]
-            if len(matches) > 0:
+            if matches:
                 nalist += matches
             else:
                 if verbose:
@@ -217,7 +218,7 @@ def _read_profiler_data_block(f,
             # not enough values to unpack (expected 7, got ...)
             raise ValueError('Unexpected header line 4--need to specify datetime_format')
         else:
-            datetime = pd.to_datetime('20{}{}{} {}{}{}'.format(Y,m,d,H,M,S))
+            datetime = pd.to_datetime(f'20{Y}{m}{d} {H}{M}{S}')
     else:
         # more general data, e.g., "2015-08-24    12:00:00     00:00"
         # - figure out expected string length by evaluating strftime
@@ -287,39 +288,37 @@ def _read_profiler_data_block(f,
     # Line 12: Start of data
     block = []
     line = f.readline()
-    while not line.strip()=='$' and not line=='':
+    while line.strip() != '$' and line != '':
         block.append(line.split())
         line = f.readline()
     df = pd.DataFrame(data=block,columns=header,dtype=float)
     df['datetime'] = datetime
-    # return data and header info if requested
-    if read_scan_properties:
-        scaninfo = {
-            'station':name,
-            'data_format':data_format,
-            # Line 6
-            'consensus_avg_time_min':cns_avg_time,
-            'num_beams':num_beams,
-            'num_range_gates':num_ranges,
-            # Line 7
-            'beam:reqd_records_for_consensus': num_records,
-            'beam:tot_num_records': tot_records,
-            'beam:consensus_window_size_m/s': cns_window_size,
-            # Line 8
-            'num_coherent_integrations': num_coherent_integrations,
-            'num_spectral_averages': num_spectral_averages,
-            'pulse_width_ns': pulse_width,
-            'inner_pulse_period_ms': inner_pulse_period,
-            # Line 9
-            'fullscale_doppler_value_m/s': doppler_value,
-            'vertical_correction_to_obliques': vertical_correction,
-            'delay_to_first_gate_ns': delay,
-            'num_gates': num_gates,
-            'gate_spacing_ns': gate_spacing,
-            # Line 10
-            'beam:azimuth_deg': beam_azimuth,
-            'beam:elevation_deg': beam_elevation,
-        }
-        return df, scaninfo
-    else:
+    if not read_scan_properties:
         return df, None
+    scaninfo = {
+        'station':name,
+        'data_format':data_format,
+        # Line 6
+        'consensus_avg_time_min':cns_avg_time,
+        'num_beams':num_beams,
+        'num_range_gates':num_ranges,
+        # Line 7
+        'beam:reqd_records_for_consensus': num_records,
+        'beam:tot_num_records': tot_records,
+        'beam:consensus_window_size_m/s': cns_window_size,
+        # Line 8
+        'num_coherent_integrations': num_coherent_integrations,
+        'num_spectral_averages': num_spectral_averages,
+        'pulse_width_ns': pulse_width,
+        'inner_pulse_period_ms': inner_pulse_period,
+        # Line 9
+        'fullscale_doppler_value_m/s': doppler_value,
+        'vertical_correction_to_obliques': vertical_correction,
+        'delay_to_first_gate_ns': delay,
+        'num_gates': num_gates,
+        'gate_spacing_ns': gate_spacing,
+        # Line 10
+        'beam:azimuth_deg': beam_azimuth,
+        'beam:elevation_deg': beam_elevation,
+    }
+    return df, scaninfo

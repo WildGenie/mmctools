@@ -161,10 +161,10 @@ class InputFile(dict):
                 string = txt[:idx].strip()
                 if string in self.special_keywords:
                     # append special keyword to name and read the next word
-                    name += '_'+string
+                    name += f'_{string}'
                     txt = txt[idx+1:].strip()
                     idx = txt.find(' ')
-                    assert (idx > 0), 'problem parsing '+string+' field'
+                    assert (idx > 0), f'problem parsing {string} field'
                     string = txt[:idx].strip()
 
             if name == '#include':
@@ -188,7 +188,7 @@ class InputFile(dict):
                         blockend = block[1]
                         blocktype = block[2]
                         break
-                assert (blockend is not None), 'Unknown input block '+blockstart
+                assert (blockend is not None), f'Unknown input block {blockstart}'
                 # find end of block
                 idx = txt.find(blockend) + 1
                 assert (idx > 0), 'Mismatched input block'
@@ -227,7 +227,7 @@ class InputFile(dict):
         if self.DEBUG:
             print('----------- parsing block -----------')
             if parent is not None:
-                print('name:',name,'parent:',str(parent))
+                print('name:', name, 'parent:', parent)
             if containertype is not None:
                 print('container type:',containertype)
         defn = defn.strip()
@@ -284,7 +284,7 @@ class InputFile(dict):
                 parent.append(newparent)
             newdefn = defn[1:-1].strip()
             if (containertype is list) \
-                    and ('(' not in newdefn) and (')' not in newdefn):
+                        and ('(' not in newdefn) and (')' not in newdefn):
                 # special treatment for lists
                 for val in newdefn.split():
                     # recursively call parse wihout a name (None for

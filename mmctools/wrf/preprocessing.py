@@ -9,10 +9,7 @@ from mmctools.helper_functions import get_nc_file_times
 from scipy.interpolate import UnivariateSpline
 
 def prompt(s):
-    if sys.version_info[0] < 3:
-        return raw_input(s)
-    else:
-        return input(s)
+    return raw_input(s) if sys.version_info[0] < 3 else input(s)
 
 
 class RDADataset(object):
@@ -50,7 +47,7 @@ class RDADataset(object):
 
     def _get_auth(self):
         pid = os.getpid()
-        self.cookie = 'auth.rda.ucar.edu.' + str(pid)
+        self.cookie = f'auth.rda.ucar.edu.{str(pid)}'
         postdata = '--post-data="email={:s}&passwd={:s}&action=login"'.format(
                 self.emailaddr,self.passwd)
         cmd = ['wget'] + self.certopts
@@ -61,7 +58,7 @@ class RDADataset(object):
             'https://rda.ucar.edu/cgi-bin/login',
         ]
         p = subprocess.run(cmd)
-        p.check_returncode() 
+        p.check_returncode()
         assert os.path.isfile(self.cookie)
 
     def __del__(self):
@@ -170,15 +167,17 @@ class ERAInterim(RDADataset):
         good_dates = datetimes.copy()
         for dt in datetimes:
             if str(dt) > era_interim_end_date:
-                print('WARNING: Bad date ({}) - after ERA-Interim EOL ({})'.format(str(dt),era_interim_end_date))
+                print(
+                    f'WARNING: Bad date ({str(dt)}) - after ERA-Interim EOL ({era_interim_end_date})'
+                )
                 good_dates = good_dates.drop(dt)
         if len(good_dates) > 0:
             datetimes = good_dates
         else:
             dates_before_end_of_era = False
-            print('WARNING: All dates are after ERA-Interim EOL ({})'.format(era_interim_end_date))
+            print(f'WARNING: All dates are after ERA-Interim EOL ({era_interim_end_date})')
             print('Not downloading anything... Need to change reanalysis for these dates!')
-        
+
         if dates_before_end_of_era:
             if path is None:
                 path = '.'
@@ -293,7 +292,7 @@ Run `conda install -c conda-forge cdsapi`""")
         """
         if prefix is None:
             prefix = os.path.join('.',product)
-        
+
         req = {
             'product_type': 'reanalysis',
             'format': 'grib',
@@ -306,10 +305,14 @@ Run `conda install -c conda-forge cdsapi`""")
             print('Requesting',len(pressure_levels),'pressure levels')
         if combine_request:
             print('Combining all datetimes into a single request')
-            req['year'] = sorted(list(set([datetime.strftime('%Y') for datetime in datetimes])))
-            req['month'] = sorted(list(set([datetime.strftime('%m') for datetime in datetimes])))
-            req['day'] = sorted(list(set([datetime.strftime('%d') for datetime in datetimes])))
-            req['time'] = sorted(list(set([datetime.strftime('%H:%M') for datetime in datetimes])))
+            req['year'] = sorted(list({datetime.strftime('%Y') for datetime in datetimes}))
+            req['month'] = sorted(
+                list({datetime.strftime('%m') for datetime in datetimes})
+            )
+            req['day'] = sorted(list({datetime.strftime('%d') for datetime in datetimes}))
+            req['time'] = sorted(
+                list({datetime.strftime('%H:%M') for datetime in datetimes})
+            )
             target = datetimes[0].strftime('{:s}_from_%Y_%m_%d_%H.grib'.format(prefix))
             self.client.retrieve(product, req, target)
         else:
@@ -495,13 +498,13 @@ class SetupWRF_old():
         elif icbc_type == 'MERRA2':
             met_lvls  = 73
 
-        icbc_dict = {'type' : icbc_type,
-                    'interval_seconds' : interval_seconds,
-                    'met_levels' : met_lvls,
-                    'soil_levels' : soil_lvls,
-                    'download_freq' : download_freq}
-
-        return icbc_dict
+        return {
+            'type': icbc_type,
+            'interval_seconds': interval_seconds,
+            'met_levels': met_lvls,
+            'soil_levels': soil_lvls,
+            'download_freq': download_freq,
+        }
 
     def _check_namelist_opts(self):
         required_fields = ['start_date','end_date','number_of_domains','dxy',
@@ -516,87 +519,86 @@ class SetupWRF_old():
             if key not in setup_keys:
                 missing_keys.append(key)
                 missing_options = True
-                
-        if not missing_options:
-            if 'usgs+' in self.setup_dict['geogrid_args']:
-                land_cat = 24
-            elif 'usgs_lakes+' in self.setup_dict['geogrid_args']:
-                land_cat = 28
-            else:
-                print('here')
-                land_cat = 21
-            namelist_defaults = {
-                       'geogrid_args' : '30s',
-                   'history_interval' : [60,60],
-                   'interval_seconds' : self.icbc_dict['interval_seconds'],
-                 'num_metgrid_levels' : self.icbc_dict['met_levels'],
-            'num_metgrid_soil_levels' : self.icbc_dict['soil_levels'],
-                    'input_from_file' : '.true.',
-                   'restart_interval' : 360,            
-                    'frames_per_file' : 1,            
-                              'debug' : 0,            
-                        'max_ts_locs' : 20,            
-                       'max_ts_level' : self.setup_dict['num_eta_levels'],            
-                         'mp_physics' : 10,            
-                              'ra_lw' : 4,            
-                              'ra_sw' : 4,
-                               'radt' : int(self.setup_dict['dxy']/1000.0),
-                  'sf_sfclay_physics' : 1,
-                 'sf_surface_physics' : 2,
-                     'bl_pbl_physics' : 1,
-                         'cu_physics' : 1,
-                             'isfflx' : 1,
-                             'ifsnow' : 0,
-                             'icloud' : 0,
-               'surface_input_source' : 1,
-                    'num_soil_layers' : self.icbc_dict['soil_levels'],
-                       'num_land_cat' : land_cat,
-                   'sf_urban_physics' : 0,
-                          'w_damping' : 1,
-                           'diff_opt' : 1,
-                             'km_opt' : 4,
-                       'diff_6th_opt' : 2,
-                    'diff_6th_factor' : 0.12,
-                          'base_temp' : 290.0,
-                           'damp_opt' : 3,
-                              'zdamp' : 5000.0,
-                           'dampcoef' : 0.2,
-                              'khdif' : 0,
-                              'kvdif' : 0,
-                              'smdiv' : 0.1,
-                    'non_hydrostatic' : '.true.',
-                      'moist_adv_opt' : 1,
-                     'scalar_adv_opt' : 1,
-                        'tke_adv_opt' : 1,
-                    'h_mom_adv_order' : 5,
-                    'v_mom_adv_order' : 3,
-                    'h_sca_adv_order' : 5,
-                    'v_sca_adv_order' : 3,
-                            'gwd_opt' : 0,
-                     'spec_bdy_width' : 5,
-                          'spec_zone' : 1,
-                         'relax_zone' : 4,
-                'nio_tasks_per_group' : 0,
-                         'nio_groups' : 1,
-                         'sst_update' : 1,
-                           'sst_skin' : 0,
-                   'sf_ocean_physics' : 0,
-            }
 
-            namelist_opts = namelist_defaults
-            for key in setup_keys:
-                namelist_opts[key] = self.setup_dict[key]
-            self.namelist_opts = namelist_opts
-        else: 
+        if missing_options:
             raise Exception("The following fields are missing from the setup dictionary: ",missing_keys)
 
+        if 'usgs+' in self.setup_dict['geogrid_args']:
+            land_cat = 24
+        elif 'usgs_lakes+' in self.setup_dict['geogrid_args']:
+            land_cat = 28
+        else:
+            print('here')
+            land_cat = 21
+        namelist_defaults = {
+                   'geogrid_args' : '30s',
+               'history_interval' : [60,60],
+               'interval_seconds' : self.icbc_dict['interval_seconds'],
+             'num_metgrid_levels' : self.icbc_dict['met_levels'],
+        'num_metgrid_soil_levels' : self.icbc_dict['soil_levels'],
+                'input_from_file' : '.true.',
+               'restart_interval' : 360,            
+                'frames_per_file' : 1,            
+                          'debug' : 0,            
+                    'max_ts_locs' : 20,            
+                   'max_ts_level' : self.setup_dict['num_eta_levels'],            
+                     'mp_physics' : 10,            
+                          'ra_lw' : 4,            
+                          'ra_sw' : 4,
+                           'radt' : int(self.setup_dict['dxy']/1000.0),
+              'sf_sfclay_physics' : 1,
+             'sf_surface_physics' : 2,
+                 'bl_pbl_physics' : 1,
+                     'cu_physics' : 1,
+                         'isfflx' : 1,
+                         'ifsnow' : 0,
+                         'icloud' : 0,
+           'surface_input_source' : 1,
+                'num_soil_layers' : self.icbc_dict['soil_levels'],
+                   'num_land_cat' : land_cat,
+               'sf_urban_physics' : 0,
+                      'w_damping' : 1,
+                       'diff_opt' : 1,
+                         'km_opt' : 4,
+                   'diff_6th_opt' : 2,
+                'diff_6th_factor' : 0.12,
+                      'base_temp' : 290.0,
+                       'damp_opt' : 3,
+                          'zdamp' : 5000.0,
+                       'dampcoef' : 0.2,
+                          'khdif' : 0,
+                          'kvdif' : 0,
+                          'smdiv' : 0.1,
+                'non_hydrostatic' : '.true.',
+                  'moist_adv_opt' : 1,
+                 'scalar_adv_opt' : 1,
+                    'tke_adv_opt' : 1,
+                'h_mom_adv_order' : 5,
+                'v_mom_adv_order' : 3,
+                'h_sca_adv_order' : 5,
+                'v_sca_adv_order' : 3,
+                        'gwd_opt' : 0,
+                 'spec_bdy_width' : 5,
+                      'spec_zone' : 1,
+                     'relax_zone' : 4,
+            'nio_tasks_per_group' : 0,
+                     'nio_groups' : 1,
+                     'sst_update' : 1,
+                       'sst_skin' : 0,
+               'sf_ocean_physics' : 0,
+        }
+
+        namelist_opts = namelist_defaults
+        for key in setup_keys:
+            namelist_opts[key] = self.setup_dict[key]
+        self.namelist_opts = namelist_opts
         return missing_keys
     
     def _link_files(self,file_list,destination_dir):
         for filen in file_list:
             file_name = filen.split('/')[-1]
             try:
-                os.symlink(filen,'{}{}'.format(destination_dir,file_name))
+                os.symlink(filen, f'{destination_dir}{file_name}')
             except FileExistsError:
                 print('file already linked')
             
@@ -606,78 +608,77 @@ class SetupWRF_old():
             os.makedirs(self.run_dir)
 
         # Link WPS and WRF files / executables
-        wps_files = glob.glob('{}[!n]*'.format(self.wps_exe_dir))
+        wps_files = glob.glob(f'{self.wps_exe_dir}[!n]*')
         self._link_files(wps_files,self.run_dir)
-        wrf_files = glob.glob('{}[!n]*'.format(self.wrf_exe_dir))
+        wrf_files = glob.glob(f'{self.wrf_exe_dir}[!n]*')
         self._link_files(wrf_files,self.run_dir)
         
     def _get_nl_str(self,num_doms,phys_opt):
-        phys_str = ''
-        for pp in range(0,num_doms):
-            if type(phys_opt) is list:
-                phys_str += '{0:>5},'.format(str(phys_opt[pp]))
-            else:
-                phys_str += '{0:>5},'.format(str(phys_opt))
-        return(phys_str)
+        return ''.join(
+            '{0:>5},'.format(str(phys_opt[pp]))
+            if type(phys_opt) is list
+            else '{0:>5},'.format(str(phys_opt))
+            for pp in range(num_doms)
+        )
     
     def write_wps_namelist(self):
         num_doms = self.namelist_opts['number_of_domains']
-        start_date_str = "'{}',".format(self.namelist_opts['start_date'].replace(' ','_'))*num_doms
-        end_date_str   = "'{}',".format(self.namelist_opts['end_date'].replace(' ','_'))*num_doms
-        geog_data_res = "'{}',".format(self.namelist_opts['geogrid_args'])*num_doms
+        start_date_str = (
+            f"'{self.namelist_opts['start_date'].replace(' ', '_')}'," * num_doms
+        )
+        end_date_str = (
+            f"'{self.namelist_opts['end_date'].replace(' ', '_')}'," * num_doms
+        )
+        geog_data_res = f"'{self.namelist_opts['geogrid_args']}'," * num_doms
         parent_ids,parent_grid_ratios,dx_str = '','',''
         istart_str,jstart_str,nx_str,ny_str = '','','',''
         for pp,pgr in enumerate(self.namelist_opts['parent_grid_ratio']):
-            if pp == 0:
-                pid = 1
-            else:
-                pid = pp
+            pid = 1 if pp == 0 else pp
             parent_ids += '{0:>5},'.format(str(pid))
             parent_grid_ratios += '{0:>5},'.format(str(pgr))
             istart_str += '{0:>5},'.format(str(self.namelist_opts['istart'][pp]))
             jstart_str += '{0:>5},'.format(str(self.namelist_opts['jstart'][pp]))
             nx_str += '{0:>5},'.format(str(self.namelist_opts['nx'][pp]))
             ny_str += '{0:>5},'.format(str(self.namelist_opts['ny'][pp]))
-        f = open('{}namelist.wps'.format(self.run_dir),'w')
-        f.write("&share\n")
-        f.write(" wrf_core = 'ARW',\n")
-        f.write(" max_dom = {},\n".format(num_doms))
-        f.write(" start_date = {}\n".format(start_date_str))
-        f.write(" end_date   = {}\n".format(end_date_str))
-        f.write(" interval_seconds = {},\n".format(self.namelist_opts['interval_seconds']))
-        f.write(" io_form_geogrid = 2,\n")
-        f.write("/\n")
-        f.write("\n")
-        f.write("&geogrid\n")
-        f.write(" parent_id         = {}\n".format(parent_ids))
-        f.write(" parent_grid_ratio = {}\n".format(parent_grid_ratios))
-        f.write(" i_parent_start    = {}\n".format(istart_str))
-        f.write(" j_parent_start    = {}\n".format(jstart_str))
-        f.write(" e_we              = {}\n".format(nx_str))
-        f.write(" e_sn              = {}\n".format(ny_str))
-        f.write(" geog_data_res     = {}\n".format(geog_data_res))
-        f.write(" dx = {}\n".format(self.namelist_opts['dxy']))
-        f.write(" dy = {}\n".format(self.namelist_opts['dxy']))
-        f.write(" map_proj = 'lambert',\n")
-        f.write(" ref_lat   = {},\n".format(self.namelist_opts['ref_lat']))
-        f.write(" ref_lon   = {},\n".format(self.namelist_opts['ref_lon']))
-        f.write(" truelat1  = {},\n".format(self.namelist_opts['true_lat1']))
-        f.write(" truelat2  = {},\n".format(self.namelist_opts['true_lat2']))
-        f.write(" stand_lon = {},\n".format(self.namelist_opts['stand_lon'])) 
-        f.write(" geog_data_path = '{}',\n".format(self.namelist_opts['geog_data_path']))
-        f.write("/\n")
-        f.write("\n")
-        f.write("&ungrib\n")
-        f.write(" out_format = 'WPS',\n")
-        f.write(" prefix = '{}',\n".format(self.namelist_opts['icbc_type'].upper()))
-        f.write("/\n")
-        f.write("\n")
-        f.write("&metgrid\n")
-        f.write(" fg_name = '{}',\n".format(self.namelist_opts['icbc_type'].upper()))
-        f.write(" io_form_metgrid = 2,\n")
-        f.write("! constants_name = 'SST:DATE', \n")
-        f.write("/\n")
-        f.close()
+        with open(f'{self.run_dir}namelist.wps', 'w') as f:
+            f.write("&share\n")
+            f.write(" wrf_core = 'ARW',\n")
+            f.write(f" max_dom = {num_doms},\n")
+            f.write(f" start_date = {start_date_str}\n")
+            f.write(f" end_date   = {end_date_str}\n")
+            f.write(f" interval_seconds = {self.namelist_opts['interval_seconds']},\n")
+            f.write(" io_form_geogrid = 2,\n")
+            f.write("/\n")
+            f.write("\n")
+            f.write("&geogrid\n")
+            f.write(f" parent_id         = {parent_ids}\n")
+            f.write(f" parent_grid_ratio = {parent_grid_ratios}\n")
+            f.write(f" i_parent_start    = {istart_str}\n")
+            f.write(f" j_parent_start    = {jstart_str}\n")
+            f.write(f" e_we              = {nx_str}\n")
+            f.write(f" e_sn              = {ny_str}\n")
+            f.write(f" geog_data_res     = {geog_data_res}\n")
+            f.write(f" dx = {self.namelist_opts['dxy']}\n")
+            f.write(f" dy = {self.namelist_opts['dxy']}\n")
+            f.write(" map_proj = 'lambert',\n")
+            f.write(f" ref_lat   = {self.namelist_opts['ref_lat']},\n")
+            f.write(f" ref_lon   = {self.namelist_opts['ref_lon']},\n")
+            f.write(f" truelat1  = {self.namelist_opts['true_lat1']},\n")
+            f.write(f" truelat2  = {self.namelist_opts['true_lat2']},\n")
+            f.write(f" stand_lon = {self.namelist_opts['stand_lon']},\n")
+            f.write(f" geog_data_path = '{self.namelist_opts['geog_data_path']}',\n")
+            f.write("/\n")
+            f.write("\n")
+            f.write("&ungrib\n")
+            f.write(" out_format = 'WPS',\n")
+            f.write(f" prefix = '{self.namelist_opts['icbc_type'].upper()}',\n")
+            f.write("/\n")
+            f.write("\n")
+            f.write("&metgrid\n")
+            f.write(f" fg_name = '{self.namelist_opts['icbc_type'].upper()}',\n")
+            f.write(" io_form_metgrid = 2,\n")
+            f.write("! constants_name = 'SST:DATE', \n")
+            f.write("/\n")
         
 
     def write_namelist_input(self):

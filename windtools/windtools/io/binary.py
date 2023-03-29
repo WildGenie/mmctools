@@ -32,7 +32,7 @@ class BinaryFile(object):
         """
         self.path = path
         self.mode = mode.strip('b')
-        self.f = open(path,self.mode+'b')
+        self.f = open(path, f'{self.mode}b')
 
     def __enter__(self):
         # Called when used with the 'with' statement
@@ -68,7 +68,7 @@ class BinaryFile(object):
     def readline(self,encoding='utf-8'):
         s = ''
         b = self.read_char(encoding)
-        while not b in ['\n','']:
+        while b not in ['\n', '']:
             s += b
             b = self.read_char(encoding)
         return s + b
@@ -78,22 +78,22 @@ class BinaryFile(object):
         if N==1:
             return self.unpack('b',self.f.read(1))[0] #short
         else:
-            return self.unpack('{:d}b',self.f.read(N*1))[0:N] #short
+            return self.unpack('{:d}b',self.f.read(N*1))[:N]
     def read_int2(self,N=1):
         if N==1:
             return self.unpack('h',self.f.read(2))[0] #short
         else:
-            return self.unpack('{:d}h'.format(N),self.f.read(N*2))[0:N] #short
+            return self.unpack('{:d}h'.format(N),self.f.read(N*2))[:N]
     def read_int4(self,N=1):
         if N==1:
             return self.unpack('i',self.f.read(4))[0] #int
         else:
-            return self.unpack('{:d}i'.format(N),self.f.read(N*4))[0:N] #int
+            return self.unpack('{:d}i'.format(N),self.f.read(N*4))[:N]
     def read_int8(self,N=1):
         if N==1:
             return self.unpack('l',self.f.read(8))[0] #long
         else:
-            return self.unpack('{:d}l'.format(N),self.f.read(N*8))[0:N] #long
+            return self.unpack('{:d}l'.format(N),self.f.read(N*8))[:N]
     def read_int(self,N=1):
         return self.read_int4(N) 
 
@@ -102,12 +102,15 @@ class BinaryFile(object):
         if N==1:
             return dtype( self.unpack('f',self.f.read(4))[0] )
         else:
-            return [ dtype(val) for val in self.unpack('{:d}f'.format(N),self.f.read(N*4))[0:N] ]
+            return [
+                dtype(val)
+                for val in self.unpack('{:d}f'.format(N), self.f.read(N * 4))[:N]
+            ]
     def read_double(self,N=1):
         if N==1:
             return self.unpack('d',self.f.read(8))[0]
         else:
-            return self.unpack('{:d}d'.format(N),self.f.read(N*8))[0:N]
+            return self.unpack('{:d}d'.format(N),self.f.read(N*8))[:N]
     def read_real4(self,N=1):
         return self.read_float(N,dtype=np.float32)
     def read_real8(self,N=1):

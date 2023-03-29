@@ -92,7 +92,9 @@ class InflowPlane(object):
 
         if output is not None:
             with open(output,'w') as f:
-                f.write('Spatial average of <u\'u\'>, <v\'v\'>, <w\'w\'> : {} {} {}\n'.format(self.uu_mean,self.vv_mean,self.ww_mean))
+                f.write(
+                    f"Spatial average of <u\'u\'>, <v\'v\'>, <w\'w\'> : {self.uu_mean} {self.vv_mean} {self.ww_mean}\n"
+                )
                 f.write('\n   Height   Standard deviation at grid points for the u component:\n')
                 for i,zi in enumerate(self.z):
                         f.write('z= {:.1f} : {}\n'.format(zi,np.sqrt(self.uu_tavg[:,i])))
@@ -316,10 +318,7 @@ class InflowPlane(object):
                 os.makedirs(prefix)
 
             # get fluctuations at current time
-            if periodic:
-                itime0 = np.mod(itime, self.N)
-            else:
-                itime0 = itime
+            itime0 = np.mod(itime, self.N) if periodic else itime
             #u[:,:] = self.U[0,itime0,:NY,:NZ] # self.U.shape==(3, NT, NY, NZ)
             #v[:,:] = self.U[1,itime0,:NY,:NZ] # self.U.shape==(3, NT, NY, NZ)
             utmp = self.U[0,itime0,:NY,:NZ].copy()
@@ -346,15 +345,15 @@ class InflowPlane(object):
                 mean_winddir_compass += 360.0
             if ref_height is not None:
                 print(('Mean wind dir at {:.1f} m is {:.1f} deg,' \
-                    + ' rotating by {:.1f} deg').format(ref_height,
+                        + ' rotating by {:.1f} deg').format(ref_height,
                         mean_winddir_compass, mean_winddir*180.0/np.pi))
             else:
                 print(('Mean wind dir is {:.1f} deg,' \
-                    + ' rotating by {:.1f} deg').format(
+                        + ' rotating by {:.1f} deg').format(
                         mean_winddir_compass, mean_winddir*180.0/np.pi))
             u[:,:] = utmp*np.cos(mean_winddir) - vtmp*np.sin(mean_winddir)
             v[:,:] = utmp*np.sin(mean_winddir) + vtmp*np.cos(mean_winddir)
-            
+
             # superimpose inlet snapshot
             u[:,:] += Uinput[itime,:,:,0]
             v[:,:] += Uinput[itime,:,:,1]
@@ -486,11 +485,7 @@ class InflowPlane(object):
         fname = os.path.join(outputdir,fname)
         print('Writing VTK block',fname)
 
-        if self.Umean is not None:
-            Umean = self.Umean
-        else:
-            Umean = 1.0
-
+        Umean = self.Umean if self.Umean is not None else 1.0
         # scale fluctuations
         Nt = int(self.N / step)
         up = np.zeros((Nt,self.NY,self.NZ))

@@ -50,7 +50,7 @@ def read_mesh(fpath,headerlength=8,chunksize=None,read_connectivity=False,verbos
             for _ in range(headerlength + 1 + 3*N):
                 f.readline()
             element_type = f.readline().strip()
-            if not element_type == 'quad4':
+            if element_type != 'quad4':
                 print(f'WARNING: element type "{element_type}" not tested')
             Ncell = int(f.readline())
             if chunksize is None:

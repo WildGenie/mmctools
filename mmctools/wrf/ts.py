@@ -338,11 +338,10 @@ class Toof(object):
             assert k in [0,-1]
             if allpts:
                 raise NotImplementedError("I don't think there's a use case for this...")
-            else:
-                selected_lat = self.domain.lat[::self.domain.nx,::self.domain.ny]
-                selected_lon = self.domain.lon[::self.domain.nx,::self.domain.ny]
-                selected_x = self.domain.x[::self.domain.nx]
-                selected_y = self.domain.y[::self.domain.ny]
+            selected_lat = self.domain.lat[::self.domain.nx,::self.domain.ny]
+            selected_lon = self.domain.lon[::self.domain.nx,::self.domain.ny]
+            selected_x = self.domain.x[::self.domain.nx]
+            selected_y = self.domain.y[::self.domain.ny]
             selected_lat = selected_lat.ravel()
             selected_lon = selected_lon.ravel()
             xx,yy = np.meshgrid(selected_x, selected_y, indexing='ij')

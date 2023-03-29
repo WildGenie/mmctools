@@ -57,7 +57,7 @@ class Probe(Reader):
 
     """
     def __init__(self,dpath=None,**kwargs):
-        if 'fields' in kwargs.keys():
+        if 'fields' in kwargs:
             kwargs['varList'] = kwargs.pop('fields')
         super().__init__(dpath,**kwargs)
 
@@ -76,7 +76,7 @@ class Probe(Reader):
             try:
                 self._read_probe_positions(f)
             except IOError:
-                print('unable to read '+fpath)
+                print(f'unable to read {fpath}')
             else:
                 array = self._read_probe_data(f)
         return array
